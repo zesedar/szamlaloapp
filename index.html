@@ -1,0 +1,1442 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Ismétlés">
+<meta name="theme-color" content="#0f0f0f">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Ismétlés-számláló</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --bg-soft: #f5f5f4;
+    --bg-tap: #e8e8e7;
+    --text: #1a1a1a;
+    --text-muted: #6b6b6b;
+    --text-faint: #9a9a9a;
+    --border: rgba(0,0,0,0.08);
+    --border-strong: rgba(0,0,0,0.18);
+    --accent: #c44a1e;
+    --success: #0f6e56;
+    --success-bg: rgba(29,158,117,0.14);
+    --pause-bg: rgba(136,135,128,0.14);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f0f0f;
+      --bg-soft: #1c1c1c;
+      --bg-tap: #2a2a2a;
+      --text: #f5f5f5;
+      --text-muted: #a3a3a3;
+      --text-faint: #6b6b6b;
+      --border: rgba(255,255,255,0.08);
+      --border-strong: rgba(255,255,255,0.18);
+      --accent: #f0997b;
+      --success: #5dcaa5;
+      --success-bg: rgba(93,202,165,0.18);
+      --pause-bg: rgba(163,163,163,0.1);
+    }
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    overscroll-behavior: none;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  body {
+    min-height: 100vh;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
+  .app {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 14px;
+    max-width: 600px;
+    width: 100%;
+    margin: 0 auto;
+  }
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 4px;
+  }
+  .title {
+    font-size: 13px;
+    color: var(--text-muted);
+    font-weight: 500;
+    text-transform: capitalize;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .wake-indicator {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--text-faint);
+    transition: background 0.2s;
+  }
+  .wake-indicator.on { background: var(--success); }
+  .icon-btn {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 6px 10px;
+    font-size: 18px;
+    border-radius: 8px;
+  }
+  .icon-btn:active { background: var(--bg-soft); }
+  .profiles {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    padding: 2px 4px;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .profiles::-webkit-scrollbar { display: none; }
+  .chip {
+    background: var(--bg-soft);
+    border: 0.5px solid var(--border-strong);
+    color: var(--text);
+    border-radius: 999px;
+    padding: 6px 12px;
+    font-size: 13px;
+    font-family: inherit;
+    font-weight: 500;
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .chip:active { background: var(--bg-tap); }
+  .chip.active {
+    background: var(--text);
+    color: var(--bg);
+    border-color: var(--text);
+  }
+  .chip-add {
+    background: transparent;
+    border: 0.5px dashed var(--border-strong);
+    color: var(--text-muted);
+    border-radius: 999px;
+    padding: 6px 11px;
+    font-size: 14px;
+    font-family: inherit;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .chip-add:active { background: var(--bg-soft); }
+  .stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px;
+  }
+  .stat {
+    background: var(--bg-soft);
+    border-radius: 10px;
+    padding: 10px 12px;
+  }
+  .stat.workout-done { background: var(--success-bg); }
+  .stat-label {
+    font-size: 11px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .stat-value {
+    font-size: 22px;
+    font-weight: 500;
+    margin-top: 4px;
+    font-variant-numeric: tabular-nums;
+  }
+  .stat.workout-done .stat-value { color: var(--success); }
+  .counter {
+    flex: 1;
+    background: var(--bg-soft);
+    border: 0.5px solid var(--border);
+    border-radius: 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.08s;
+    min-height: 220px;
+    position: relative;
+  }
+  .counter.tapped {
+    background: var(--bg-tap);
+    transform: scale(0.995);
+  }
+  .counter.target-hit { background: var(--success-bg); }
+  .counter.pause { background: var(--pause-bg); }
+  .counter-hint {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+  }
+  .counter-value {
+    font-size: clamp(100px, 28vw, 160px);
+    font-weight: 500;
+    line-height: 1;
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+    display: flex;
+    align-items: baseline;
+    justify-content: center;
+  }
+  .counter-target {
+    font-size: 0.32em;
+    color: var(--text-faint);
+    font-weight: 500;
+    margin-left: 0.1em;
+  }
+  .counter-unit {
+    font-size: 13px;
+    color: var(--text-faint);
+    margin-top: 10px;
+    font-variant-numeric: tabular-nums;
+  }
+  .counter-unit.rep-timing { color: var(--accent); font-weight: 500; }
+  .counter-unit.rep-pause { color: var(--text-muted); font-weight: 500; }
+  .rest-bar {
+    font-size: 14px;
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+    min-height: 20px;
+    text-align: center;
+    font-weight: 500;
+    transition: color 0.2s;
+  }
+  .rest-bar.warning { color: var(--accent); font-size: 16px; }
+  .rest-bar.done { color: var(--success); font-size: 18px; }
+  .history {
+    font-size: 13px;
+    color: var(--text-muted);
+    text-align: center;
+    min-height: 18px;
+    font-variant-numeric: tabular-nums;
+    padding: 0 8px;
+    word-break: break-word;
+  }
+  .controls {
+    display: grid;
+    grid-template-columns: 1fr 1.4fr 1fr;
+    gap: 8px;
+  }
+  .btn {
+    background: var(--bg-soft);
+    border: 0.5px solid var(--border-strong);
+    color: var(--text);
+    border-radius: 10px;
+    padding: 16px 8px;
+    font-size: 15px;
+    font-family: inherit;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.08s;
+  }
+  .btn:active { background: var(--bg-tap); }
+  .btn-primary {
+    background: var(--text);
+    color: var(--bg);
+    border-color: var(--text);
+  }
+  .btn-primary:active { opacity: 0.85; }
+  .btn-primary.ready {
+    animation: pulse 1.1s ease-in-out infinite;
+  }
+  .btn-small {
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+  @keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.03); }
+  }
+  .settings-panel {
+    display: none;
+    background: var(--bg-soft);
+    border-radius: 12px;
+    padding: 12px 14px;
+    flex-direction: column;
+    gap: 12px;
+    font-size: 14px;
+  }
+  .settings-panel.open { display: flex; }
+  .setting-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    min-height: 32px;
+  }
+  .toggle {
+    position: relative;
+    width: 44px;
+    height: 24px;
+    background: var(--border-strong);
+    border-radius: 999px;
+    cursor: pointer;
+    transition: background 0.15s;
+    flex-shrink: 0;
+  }
+  .toggle.on { background: var(--accent); }
+  .toggle::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 20px;
+    height: 20px;
+    background: #fff;
+    border-radius: 50%;
+    transition: left 0.15s;
+  }
+  .toggle.on::after { left: 22px; }
+  .stepper {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    background: var(--bg);
+    border-radius: 8px;
+    padding: 2px;
+    border: 0.5px solid var(--border);
+  }
+  .step-btn {
+    background: transparent;
+    border: none;
+    color: var(--text);
+    width: 30px;
+    height: 28px;
+    border-radius: 6px;
+    font-size: 18px;
+    font-weight: 500;
+    cursor: pointer;
+    font-family: inherit;
+    line-height: 1;
+  }
+  .step-btn:active { background: var(--bg-tap); }
+  .step-btn:disabled { color: var(--text-faint); cursor: not-allowed; }
+  .step-value {
+    min-width: 52px;
+    text-align: center;
+    font-size: 15px;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+  }
+  .section-label {
+    font-size: 11px;
+    color: var(--text-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-top: 4px;
+    margin-bottom: -4px;
+  }
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.55);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    padding: 16px;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--bg);
+    border-radius: 16px;
+    padding: 18px 20px;
+    max-width: 420px;
+    width: 100%;
+    max-height: 85vh;
+    overflow-y: auto;
+    border: 0.5px solid var(--border);
+  }
+  .modal-title {
+    font-size: 17px;
+    font-weight: 500;
+    margin: 0 0 14px 0;
+  }
+  .modal-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    font-size: 14px;
+    gap: 10px;
+  }
+  .modal-input {
+    background: var(--bg-soft);
+    border: 0.5px solid var(--border-strong);
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 14px;
+    color: var(--text);
+    font-family: inherit;
+    width: 55%;
+    text-align: right;
+  }
+  .modal-input[type="text"] { text-align: left; }
+  .modal-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 16px;
+    justify-content: flex-end;
+  }
+  .profile-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 12px;
+  }
+  .profile-list-empty {
+    color: var(--text-muted);
+    font-size: 13px;
+    text-align: center;
+    padding: 20px 0;
+  }
+  .profile-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 12px;
+    background: var(--bg-soft);
+    border-radius: 10px;
+    gap: 8px;
+  }
+  .profile-info { flex: 1; min-width: 0; }
+  .profile-name {
+    font-size: 14px;
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .profile-detail {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 2px;
+    font-variant-numeric: tabular-nums;
+  }
+  .profile-actions {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+  .icon-mini-btn {
+    background: transparent;
+    border: 0.5px solid var(--border-strong);
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 6px 10px;
+    font-size: 13px;
+    border-radius: 7px;
+    font-family: inherit;
+  }
+  .icon-mini-btn:active { background: var(--bg-tap); }
+  #keep-awake-video {
+    position: fixed;
+    width: 2px;
+    height: 2px;
+    top: -10px;
+    left: -10px;
+    opacity: 0.01;
+    pointer-events: none;
+    z-index: -1;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <div class="title">
+      <span class="wake-indicator" id="wake-indicator" title="Képernyő-ébrentartás állapota"></span>
+      <span id="date-title">Mai edzés</span>
+    </div>
+    <button class="icon-btn" id="settings-toggle" aria-label="Beállítások">⚙</button>
+  </div>
+
+  <div class="profiles" id="profiles"></div>
+
+  <div class="settings-panel" id="settings-panel">
+    <div class="section-label">Szett</div>
+    <div class="setting-row">
+      <span>Cél / szett <span style="color:var(--text-faint);font-size:12px;">(0 = nincs)</span></span>
+      <div class="stepper">
+        <button class="step-btn" id="target-dec">−</button>
+        <span class="step-value" id="target-value">10</span>
+        <button class="step-btn" id="target-inc">+</button>
+      </div>
+    </div>
+    <div class="setting-row">
+      <span>Cél szettszám <span style="color:var(--text-faint);font-size:12px;">(0 = nincs)</span></span>
+      <div class="stepper">
+        <button class="step-btn" id="target-sets-dec">−</button>
+        <span class="step-value" id="target-sets-value">0</span>
+        <button class="step-btn" id="target-sets-inc">+</button>
+      </div>
+    </div>
+    <div class="setting-row">
+      <span>Automatikus szettváltás</span>
+      <div class="toggle" id="toggle-auto-advance" role="switch"></div>
+    </div>
+
+    <div class="section-label">Ismétlés</div>
+    <div class="setting-row">
+      <span>Idő / ismétlés <span style="color:var(--text-faint);font-size:12px;">(0 = ki)</span></span>
+      <div class="stepper">
+        <button class="step-btn" id="rep-dur-dec">−</button>
+        <span class="step-value" id="rep-dur-value">ki</span>
+        <button class="step-btn" id="rep-dur-inc">+</button>
+      </div>
+    </div>
+    <div class="setting-row">
+      <span>Automatikus következő ismétlés <span style="color:var(--text-faint);font-size:12px;">(tempó vagy szünet után)</span></span>
+      <div class="toggle" id="toggle-auto-rep" role="switch"></div>
+    </div>
+    <div class="setting-row">
+      <span>Szünet ismétlések közt <span style="color:var(--text-faint);font-size:12px;">(0 = nincs)</span></span>
+      <div class="stepper">
+        <button class="step-btn" id="rep-pause-dec">−</button>
+        <span class="step-value" id="rep-pause-value">ki</span>
+        <button class="step-btn" id="rep-pause-inc">+</button>
+      </div>
+    </div>
+
+    <div class="section-label">Pihenő</div>
+    <div class="setting-row">
+      <span>Pihenő időzítő</span>
+      <div class="toggle" id="toggle-rest" role="switch"></div>
+    </div>
+    <div class="setting-row">
+      <span>Pihenő ideje</span>
+      <div class="stepper">
+        <button class="step-btn" id="rest-dec">−</button>
+        <span class="step-value" id="rest-value">1:30</span>
+        <button class="step-btn" id="rest-inc">+</button>
+      </div>
+    </div>
+    <div class="setting-row">
+      <span>3-2-1 előjelzés a végén</span>
+      <div class="toggle" id="toggle-countdown" role="switch"></div>
+    </div>
+
+    <div class="section-label">Jelzések</div>
+    <div class="setting-row">
+      <span>Hangos számolás</span>
+      <div class="toggle" id="toggle-voice" role="switch"></div>
+    </div>
+    <div class="setting-row">
+      <span>Rezgés</span>
+      <div class="toggle" id="toggle-vibrate" role="switch"></div>
+    </div>
+    <div class="setting-row">
+      <span>Képernyő ébren</span>
+      <div class="toggle" id="toggle-wake" role="switch"></div>
+    </div>
+  </div>
+
+  <div class="stats">
+    <div class="stat" id="stat-sets">
+      <div class="stat-label">Szett</div>
+      <div class="stat-value" id="sets">0</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Előző</div>
+      <div class="stat-value" id="prev">–</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Összes</div>
+      <div class="stat-value" id="total">0</div>
+    </div>
+  </div>
+
+  <div class="counter" id="counter" role="button" tabindex="0" aria-label="Ismétlés számlálása">
+    <div class="counter-hint">Tapints</div>
+    <div class="counter-value">
+      <span id="reps">0</span><span class="counter-target" id="reps-target"></span>
+    </div>
+    <div class="counter-unit" id="counter-unit">ismétlés</div>
+  </div>
+
+  <div class="rest-bar" id="rest-display"></div>
+  <div class="history" id="history"></div>
+
+  <div class="controls">
+    <button class="btn" id="minus">−1</button>
+    <button class="btn btn-primary" id="new-set">Új szett</button>
+    <button class="btn" id="reset">Nullázás</button>
+  </div>
+</div>
+
+<div class="modal-overlay" id="profiles-modal">
+  <div class="modal">
+    <h2 class="modal-title">Profilok</h2>
+    <div class="profile-list" id="profile-list"></div>
+    <div class="modal-actions">
+      <button class="btn btn-small" id="profiles-close">Bezár</button>
+      <button class="btn btn-primary btn-small" id="profiles-new">Új profil</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="edit-modal">
+  <div class="modal">
+    <h2 class="modal-title" id="edit-title">Új profil</h2>
+    <div class="modal-row">
+      <span>Név</span>
+      <input type="text" class="modal-input" id="edit-name" maxlength="24" placeholder="pl. Fekvenyomás">
+    </div>
+    <div class="modal-row">
+      <span>Cél / szett</span>
+      <input type="number" class="modal-input" id="edit-target" min="1" max="100" inputmode="numeric">
+    </div>
+    <div class="modal-row">
+      <span>Cél szettszám</span>
+      <input type="number" class="modal-input" id="edit-sets" min="0" max="20" inputmode="numeric">
+    </div>
+    <div class="modal-row">
+      <span>Pihenő (mp)</span>
+      <input type="number" class="modal-input" id="edit-rest" min="0" max="600" inputmode="numeric">
+    </div>
+    <div class="modal-row">
+      <span>Idő / ismétlés (mp)</span>
+      <input type="number" class="modal-input" id="edit-rep-dur" min="0" max="20" inputmode="numeric">
+    </div>
+    <div class="modal-row">
+      <span>Szünet ism. közt (mp)</span>
+      <input type="number" class="modal-input" id="edit-rep-pause" min="0" max="20" inputmode="numeric">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-small" id="edit-cancel">Mégse</button>
+      <button class="btn btn-primary btn-small" id="edit-save">Mentés</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// Register service worker so Chrome recognizes this as an installable PWA
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  });
+}
+(function() {
+  const STATE_KEY = 'ismetles-szamlalo-v6';
+  const PROFILES_KEY = 'ismetles-profilok-v3';
+  const todayStr = () => new Date().toISOString().slice(0, 10);
+
+  const DEFAULTS = {
+    voice: true, vibrate: true, wake: true, rest: true, countdown: true,
+    autoAdvance: true, autoRep: false,
+    target: 10, targetSets: 0, restDuration: 90,
+    repDuration: 0, repPause: 0
+  };
+
+  const DEFAULT_PROFILES = [
+    { id: 'p1', name: '5×5 erő', target: 5, targetSets: 5, restDuration: 180, repDuration: 0, repPause: 0 },
+    { id: 'p2', name: '3×10 hipertrófia', target: 10, targetSets: 3, restDuration: 90, repDuration: 0, repPause: 0 },
+    { id: 'p3', name: '4×8 vegyes', target: 8, targetSets: 4, restDuration: 120, repDuration: 0, repPause: 0 },
+    { id: 'p4', name: 'Bemelegítés', target: 15, targetSets: 2, restDuration: 45, repDuration: 0, repPause: 0 }
+  ];
+
+  let state = {
+    date: todayStr(),
+    reps: 0, sets: 0, total: 0,
+    history: [],
+    activeProfileId: null,
+    workoutCompleted: false,
+    settings: Object.assign({}, DEFAULTS)
+  };
+
+  let profiles = DEFAULT_PROFILES.slice();
+
+  try {
+    const saved = JSON.parse(localStorage.getItem(STATE_KEY) || 'null');
+    if (saved) {
+      state.settings = Object.assign({}, DEFAULTS, saved.settings || {});
+      if (saved.date === state.date) {
+        state.reps = saved.reps || 0;
+        state.sets = saved.sets || 0;
+        state.total = saved.total || 0;
+        state.history = saved.history || [];
+        state.activeProfileId = saved.activeProfileId || null;
+        state.workoutCompleted = !!saved.workoutCompleted;
+      }
+    }
+  } catch (e) {}
+
+  try {
+    const sp = JSON.parse(localStorage.getItem(PROFILES_KEY) || 'null');
+    if (Array.isArray(sp)) profiles = sp.map(p => Object.assign({repDuration: 0, repPause: 0}, p));
+  } catch (e) {}
+
+  function saveState() { try { localStorage.setItem(STATE_KEY, JSON.stringify(state)); } catch (e) {} }
+  function saveProfiles() { try { localStorage.setItem(PROFILES_KEY, JSON.stringify(profiles)); } catch (e) {} }
+
+  const $ = id => document.getElementById(id);
+
+  $('date-title').textContent = new Date().toLocaleDateString('hu-HU', {
+    weekday: 'long', month: 'long', day: 'numeric'
+  });
+
+  // --- Speech ---
+  let huVoice = null;
+  function pickVoice() {
+    if (!window.speechSynthesis) return;
+    const voices = speechSynthesis.getVoices();
+    huVoice = voices.find(v => v.lang && v.lang.toLowerCase().startsWith('hu')) || null;
+  }
+  if (window.speechSynthesis) {
+    pickVoice();
+    speechSynthesis.onvoiceschanged = pickVoice;
+  }
+  function speak(text, rate) {
+    if (!state.settings.voice || !window.speechSynthesis) return;
+    try {
+      speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(String(text));
+      u.lang = 'hu-HU';
+      if (huVoice) u.voice = huVoice;
+      u.rate = rate || 1.15;
+      speechSynthesis.speak(u);
+    } catch (e) {}
+  }
+
+  // --- Audio ---
+  let audioCtx = null;
+  function beep(freq, duration, volume) {
+    try {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = freq || 800;
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      const v = volume || 0.25;
+      const d = (duration || 180) / 1000;
+      gain.gain.setValueAtTime(0, audioCtx.currentTime);
+      gain.gain.linearRampToValueAtTime(v, audioCtx.currentTime + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + d);
+      osc.start();
+      osc.stop(audioCtx.currentTime + d);
+    } catch (e) {}
+  }
+
+  function buzz(pattern) {
+    if (!state.settings.vibrate || !navigator.vibrate) return;
+    try { navigator.vibrate(pattern); } catch (e) {}
+  }
+
+  // --- Keep-awake ---
+  let wakeLock = null;
+  let keepAwakeVideo = null;
+  let keepAwakeRaf = null;
+
+  async function requestWakeLock() {
+    if (!state.settings.wake) return;
+    if (!('wakeLock' in navigator)) return;
+    if (wakeLock) return;
+    try {
+      wakeLock = await navigator.wakeLock.request('screen');
+      wakeLock.addEventListener('release', () => {
+        wakeLock = null;
+        updateWakeIndicator();
+        if (state.settings.wake && document.visibilityState === 'visible') {
+          setTimeout(requestWakeLock, 200);
+        }
+      });
+      updateWakeIndicator();
+    } catch (e) {
+      updateWakeIndicator();
+    }
+  }
+  function releaseWakeLock() {
+    if (wakeLock) { try { wakeLock.release(); } catch (e) {} wakeLock = null; }
+    updateWakeIndicator();
+  }
+
+  // Tiny silent looping videos as base64 data URLs (from NoSleep.js).
+  // Real media playback is much more reliable at preventing screen sleep
+  // than canvas captureStream, especially on Chrome for Android.
+  const KEEP_AWAKE_MP4 = 'data:video/mp4;base64,AAAAHGZ0eXBpc29tAAACAGlzb21pc28ybXA0MQAAAAhmcmVlAAAC721kYXQhEAUgpBv/IQFIEP8hAUgQ/yEBSBD/IQFIEP8hAUgQ/yEBSBD/IQFIEP8hAUgQ/yEBSBD/IQFIEP8hAUgQ/yEBSBD/IQFIEP8hAUgQ/yEBSBD/IQFIEP8hAUgQ/yEBSBD/IQFIEP8hAUgQ/yEBSBD/IQFIEP8hAUgQ/yEBSBD/IQFIEP8hAUgQ/yEBSBD/IQFIEP8hAUgQ/yEBSBD/IQFIEP8hAUgQ/yEBSBD/IQFIEP8hAUgQ/yEBSBD/IQFIEP8hAUgQ/yEBSBD/IQFIEP8hAUgQ/yEBSBD/IQFIEP8hAUgQ/yEBSBD/IQFIEP8hAUgQ/yEBSBD/IQFIEP8hAUgQ/yEBSBD/IQFIEP8hAUgQ/yEBSBD/IQFIEP8hAUgQ/yEBSBD/IQFIEP8hAUgQ/yEBSBD/IQFIEP8hAUgQ/yEBSBD/IQFIEP8hAUgQ/yEBSBD/IQFIEP8hAUgQ/yEBSBD/IQFIEP8hAUgQ/yEBSBD/IQFIEP8hAUgQ/yEBSBD/IQFIEP8hAUgQ/yEBSBD/IQFIEP8hAUgQ/yEBSBD/IQFIEP8hAUgQ/yEBSBD/IQFIEP8hAUgQ/yEBSBD/IQFIEP8hAUgQ/yEBSBD/IQFIEP8hAUgQ/yEBSBD/IQFIEP8hAUgQ/yEBSBD/IQFIEP8hAUgQ/yEBSBD/IQFIEP8hAUgQ/yEBSBD/IQFIEP8hAUgQ/yEBSBD/IQFIEP8hAUgQ/yEBSBD/IQFIEP8hAUgQ/yEBSBD/IQFIEP8hAUgQ/yEBSBD/IQFIEP8hAUgQ/yEBSBD/IQFIEP8hAUgQ/yEBSBD/IQFIEP8hAUgQ/yEBSBD/IQFIEP8hAUgQ/yEBSBD/IQFIEP8hAUgQ/yEBSBD/IQFIEP8hAUgQ/yEBSBD/IQFIEP8hAUgQ/yEBSBD/IQFIEP8hAUgQ/yEBSBD/IQFIEP8hAUgQ/yEBSBD/IQFIEP8hAUgQ/yEBSBD/IQFIEP8hAUgQ/yEBSBD/IQFIEP8hAUgQ/yEBSBD/IQFIEP8hAUgQ/yEBSBD/IQFIEP8hAUgQ/yEBSBD/IQFIEP8hAUgQ/yEBSBD/IQFIEP8hAUgQ/yEBSBD/IQFIEP8hAUgQ/yEBSBD/IQFIEP8hAUgQ/yEBSBD/IQFIEP8hAUgQ/yEBSBD/IQFIEP8hAUgQ/yEBSBD/IQFIEP8hAUgQ/yEBSBD/IQFIEP8hAUgQ/w==';
+
+  function startKeepAwakeVideo() {
+    if (!state.settings.wake) return;
+    if (keepAwakeVideo) return;
+    try {
+      const video = document.createElement('video');
+      video.id = 'keep-awake-video';
+      video.setAttribute('playsinline', '');
+      video.setAttribute('muted', '');
+      video.setAttribute('loop', '');
+      video.muted = true;
+      video.loop = true;
+      video.src = KEEP_AWAKE_MP4;
+      document.body.appendChild(video);
+      const p = video.play();
+      if (p && p.catch) p.catch(() => {
+        // Playback failed (often iOS without user gesture).
+        // Fall back to canvas stream as a secondary mechanism.
+        startCanvasStreamFallback(video);
+      });
+      keepAwakeVideo = video;
+      updateWakeIndicator();
+    } catch (e) {}
+  }
+
+  function startCanvasStreamFallback(video) {
+    try {
+      const canvas = document.createElement('canvas');
+      canvas.width = 2; canvas.height = 2;
+      const ctx = canvas.getContext('2d');
+      let frame = 0;
+      function paint() {
+        ctx.fillStyle = (frame++ % 2) ? '#000' : '#010101';
+        ctx.fillRect(0, 0, 2, 2);
+        keepAwakeRaf = requestAnimationFrame(paint);
+      }
+      paint();
+      video.srcObject = canvas.captureStream();
+      const p = video.play();
+      if (p && p.catch) p.catch(() => {});
+    } catch (e) {}
+  }
+
+  function stopKeepAwakeVideo() {
+    if (keepAwakeRaf) { cancelAnimationFrame(keepAwakeRaf); keepAwakeRaf = null; }
+    if (keepAwakeVideo) {
+      try {
+        keepAwakeVideo.pause();
+        keepAwakeVideo.removeAttribute('src');
+        keepAwakeVideo.load();
+        keepAwakeVideo.remove();
+      } catch (e) {}
+      keepAwakeVideo = null;
+    }
+    updateWakeIndicator();
+  }
+  function enableKeepAwake() { requestWakeLock(); startKeepAwakeVideo(); }
+  function disableKeepAwake() { releaseWakeLock(); stopKeepAwakeVideo(); }
+  function updateWakeIndicator() {
+    const el = $('wake-indicator');
+    if (!el) return;
+    const active = !!wakeLock || !!keepAwakeVideo;
+    el.classList.toggle('on', active && state.settings.wake);
+  }
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && state.settings.wake) {
+      requestWakeLock();
+      if (keepAwakeVideo && keepAwakeVideo.paused) {
+        const p = keepAwakeVideo.play();
+        if (p && p.catch) p.catch(() => {});
+      }
+    }
+  });
+
+  // --- Rest timer ---
+  let restEndTime = null;
+  let restInterval = null;
+  let restSignaled = false;
+  let lastWarningSec = null;
+
+  function startRest() {
+    stopRest();
+    if (!state.settings.rest || state.settings.restDuration <= 0) return;
+    restEndTime = Date.now() + state.settings.restDuration * 1000;
+    restSignaled = false;
+    lastWarningSec = null;
+    restInterval = setInterval(updateRest, 200);
+    updateRest();
+    if (state.settings.wake) enableKeepAwake();
+  }
+  function stopRest() {
+    if (restInterval) clearInterval(restInterval);
+    restInterval = null;
+    restEndTime = null;
+    restSignaled = false;
+    lastWarningSec = null;
+    const rd = $('rest-display');
+    rd.textContent = '';
+    rd.classList.remove('done', 'warning');
+  }
+  function formatTime(s) {
+    const m = Math.floor(s / 60);
+    const sec = s % 60;
+    return m + ':' + String(sec).padStart(2, '0');
+  }
+  function updateRest() {
+    if (!restEndTime) return;
+    const remaining = Math.ceil((restEndTime - Date.now()) / 1000);
+    const rd = $('rest-display');
+    if (remaining > 0) {
+      rd.textContent = 'Pihenő: ' + formatTime(remaining);
+      if (remaining <= 3) rd.classList.add('warning');
+      else rd.classList.remove('warning', 'done');
+      if (state.settings.countdown && remaining <= 3 && remaining !== lastWarningSec) {
+        lastWarningSec = remaining;
+        beep(600, 90);
+        buzz(40);
+      }
+    } else {
+      rd.textContent = 'Indulhat!';
+      rd.classList.remove('warning');
+      rd.classList.add('done');
+      if (!restSignaled) {
+        restSignaled = true;
+        buzz([150, 80, 150, 80, 300]);
+        beep(1100, 400);
+        setTimeout(() => speak('Indulhat'), 450);
+      }
+    }
+  }
+
+  // --- Per-rep tempo timer (active rep) ---
+  let repTimerInterval = null;
+  let repTimerCounter = 0;
+  let repTimerOnComplete = null;
+
+  function startRepTimer(onComplete) {
+    stopRepTimer();
+    const duration = state.settings.repDuration;
+    if (duration <= 0) {
+      if (onComplete) onComplete();
+      return;
+    }
+    repTimerCounter = 1;
+    repTimerOnComplete = onComplete || null;
+    speak(String(repTimerCounter));
+    updateCounterUnit();
+    repTimerInterval = setInterval(() => {
+      repTimerCounter++;
+      if (repTimerCounter > duration) {
+        const cb = repTimerOnComplete;
+        stopRepTimer();
+        if (cb) cb();
+        return;
+      }
+      speak(String(repTimerCounter));
+      updateCounterUnit();
+    }, 1000);
+  }
+  function stopRepTimer() {
+    if (repTimerInterval) clearInterval(repTimerInterval);
+    repTimerInterval = null;
+    repTimerCounter = 0;
+    repTimerOnComplete = null;
+    updateCounterUnit();
+  }
+
+  // --- Inter-rep pause (between auto-advancing reps) ---
+  let repPauseInterval = null;
+  let repPauseRemaining = 0;
+  let repPauseOnComplete = null;
+
+  function startRepPause(onComplete) {
+    stopRepPause();
+    const dur = state.settings.repPause;
+    if (dur <= 0) {
+      if (onComplete) onComplete();
+      return;
+    }
+    repPauseRemaining = dur;
+    repPauseOnComplete = onComplete || null;
+    $('counter').classList.add('pause');
+    updateCounterUnit();
+    // Start of pause: short soft low beep to mark the boundary
+    beep(440, 70, 0.15);
+    // If pause is only 1 second long, fire the "next rep" signal immediately
+    let nextRepSignalFired = false;
+    function fireNextRepSignal() {
+      if (nextRepSignalFired) return;
+      nextRepSignalFired = true;
+      beep(660, 90, 0.2);
+      setTimeout(() => beep(990, 130, 0.22), 100);
+      buzz(60);
+    }
+    if (dur <= 1) fireNextRepSignal();
+    repPauseInterval = setInterval(() => {
+      repPauseRemaining--;
+      // Fire "next rep" signal at the start of the final second
+      if (repPauseRemaining === 1) fireNextRepSignal();
+      if (repPauseRemaining <= 0) {
+        const cb = repPauseOnComplete;
+        stopRepPause();
+        if (cb) cb();
+        return;
+      }
+      updateCounterUnit();
+    }, 1000);
+  }
+  function stopRepPause() {
+    if (repPauseInterval) clearInterval(repPauseInterval);
+    repPauseInterval = null;
+    repPauseRemaining = 0;
+    repPauseOnComplete = null;
+    $('counter').classList.remove('pause');
+    updateCounterUnit();
+  }
+
+  function updateCounterUnit() {
+    const el = $('counter-unit');
+    const dur = state.settings.repDuration;
+    el.classList.remove('rep-timing', 'rep-pause');
+    if (repPauseInterval && repPauseRemaining > 0) {
+      el.textContent = 'szünet · ' + repPauseRemaining + ' mp';
+      el.classList.add('rep-pause');
+    } else if (repTimerInterval && dur > 0) {
+      el.textContent = repTimerCounter + ' / ' + dur + ' mp';
+      el.classList.add('rep-timing');
+    } else {
+      el.textContent = 'ismétlés';
+    }
+  }
+
+  // --- Auto-advance (set-level) ---
+  let autoAdvanceTimeout = null;
+  function scheduleAutoAdvance(delay) {
+    cancelAutoAdvance();
+    autoAdvanceTimeout = setTimeout(() => {
+      autoAdvanceTimeout = null;
+      doNewSet(true);
+    }, delay != null ? delay : 1500);
+  }
+  function cancelAutoAdvance() {
+    if (autoAdvanceTimeout) { clearTimeout(autoAdvanceTimeout); autoAdvanceTimeout = null; }
+  }
+
+  // --- Set complete signal ---
+  function triggerSetCompleteSignal() {
+    const c = $('counter');
+    c.classList.add('target-hit');
+    buzz([60, 50, 60, 50, 120]);
+    beep(660, 120);
+    setTimeout(() => beep(880, 200), 170);
+    setTimeout(() => speak('szett kész', 1.05), 450);
+    setTimeout(() => c.classList.remove('target-hit'), 1200);
+  }
+
+  function triggerWorkoutComplete() {
+    buzz([200, 80, 200, 80, 200, 80, 400]);
+    setTimeout(() => beep(660, 140), 0);
+    setTimeout(() => beep(880, 140), 160);
+    setTimeout(() => beep(1320, 400), 320);
+    setTimeout(() => speak('edzés kész', 1.0), 800);
+    $('stat-sets').classList.add('workout-done');
+  }
+
+  // --- Render ---
+  function render() {
+    $('reps').textContent = state.reps;
+    const targetSets = state.settings.targetSets;
+    $('sets').textContent = targetSets > 0 ? (state.sets + '/' + targetSets) : state.sets;
+    $('total').textContent = state.total;
+    $('prev').textContent = state.history.length ? state.history[state.history.length - 1] : '–';
+    $('history').textContent = state.history.length ? state.history.join(' · ') : '';
+    const target = state.settings.target;
+    $('reps-target').textContent = target > 0 ? ' / ' + target : '';
+    const newSetBtn = $('new-set');
+    if (target > 0 && state.reps >= target) newSetBtn.classList.add('ready');
+    else newSetBtn.classList.remove('ready');
+    const statSets = $('stat-sets');
+    if (state.workoutCompleted) statSets.classList.add('workout-done');
+    else statSets.classList.remove('workout-done');
+    renderProfiles();
+    saveState();
+  }
+
+  // --- Profiles UI ---
+  function renderProfiles() {
+    const el = $('profiles');
+    el.innerHTML = '';
+    profiles.forEach(p => {
+      const chip = document.createElement('button');
+      chip.className = 'chip' + (state.activeProfileId === p.id ? ' active' : '');
+      chip.textContent = p.name;
+      chip.addEventListener('click', () => applyProfile(p));
+      el.appendChild(chip);
+    });
+    const add = document.createElement('button');
+    add.className = 'chip-add';
+    add.textContent = '⋯';
+    add.setAttribute('aria-label', 'Profilok kezelése');
+    add.addEventListener('click', openProfilesModal);
+    el.appendChild(add);
+  }
+
+  function applyProfile(p) {
+    state.settings.target = p.target;
+    state.settings.targetSets = p.targetSets || 0;
+    state.settings.restDuration = p.restDuration;
+    state.settings.repDuration = p.repDuration || 0;
+    state.settings.repPause = p.repPause || 0;
+    state.activeProfileId = p.id;
+    updateTargetDisplay();
+    updateTargetSetsDisplay();
+    updateRestDisplay();
+    updateRepDurDisplay();
+    updateRepPauseDisplay();
+    render();
+  }
+
+  function renderProfileList() {
+    const list = $('profile-list');
+    list.innerHTML = '';
+    if (profiles.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'profile-list-empty';
+      empty.textContent = 'Még nincsenek profilok.';
+      list.appendChild(empty);
+      return;
+    }
+    profiles.forEach(p => {
+      const item = document.createElement('div');
+      item.className = 'profile-item';
+      const info = document.createElement('div');
+      info.className = 'profile-info';
+      const name = document.createElement('div');
+      name.className = 'profile-name';
+      name.textContent = p.name;
+      const detail = document.createElement('div');
+      detail.className = 'profile-detail';
+      const setsPart = p.targetSets > 0 ? p.targetSets + '×' : '';
+      let tempoPart = '';
+      if (p.repDuration > 0) {
+        tempoPart = ' · ' + p.repDuration + ' mp/ism';
+        if (p.repPause > 0) tempoPart += ' + ' + p.repPause + ' mp sz.';
+      }
+      detail.textContent = setsPart + p.target + ' ism · ' + formatTime(p.restDuration) + ' pihenő' + tempoPart;
+      info.appendChild(name); info.appendChild(detail);
+      const actions = document.createElement('div');
+      actions.className = 'profile-actions';
+      const editBtn = document.createElement('button');
+      editBtn.className = 'icon-mini-btn';
+      editBtn.textContent = 'Szerk';
+      editBtn.addEventListener('click', () => openEditModal(p));
+      const delBtn = document.createElement('button');
+      delBtn.className = 'icon-mini-btn';
+      delBtn.textContent = 'Töröl';
+      delBtn.addEventListener('click', () => {
+        if (confirm('Törlöd: "' + p.name + '"?')) {
+          profiles = profiles.filter(x => x.id !== p.id);
+          if (state.activeProfileId === p.id) state.activeProfileId = null;
+          saveProfiles();
+          renderProfileList();
+          render();
+        }
+      });
+      actions.appendChild(editBtn); actions.appendChild(delBtn);
+      item.appendChild(info); item.appendChild(actions);
+      list.appendChild(item);
+    });
+  }
+
+  function openProfilesModal() { renderProfileList(); $('profiles-modal').classList.add('open'); }
+  function closeProfilesModal() { $('profiles-modal').classList.remove('open'); }
+
+  let editingProfile = null;
+  function openEditModal(p) {
+    editingProfile = p || null;
+    $('edit-title').textContent = p ? 'Profil szerkesztése' : 'Új profil';
+    $('edit-name').value = p ? p.name : '';
+    $('edit-target').value = p ? p.target : 10;
+    $('edit-sets').value = p ? p.targetSets : 3;
+    $('edit-rest').value = p ? p.restDuration : 90;
+    $('edit-rep-dur').value = p ? (p.repDuration || 0) : 0;
+    $('edit-rep-pause').value = p ? (p.repPause || 0) : 0;
+    closeProfilesModal();
+    $('edit-modal').classList.add('open');
+    setTimeout(() => $('edit-name').focus(), 50);
+  }
+  function closeEditModal() { $('edit-modal').classList.remove('open'); editingProfile = null; }
+  function saveEdit() {
+    const name = ($('edit-name').value || '').trim();
+    const target = parseInt($('edit-target').value, 10);
+    const targetSets = parseInt($('edit-sets').value, 10);
+    const restDuration = parseInt($('edit-rest').value, 10);
+    const repDuration = parseInt($('edit-rep-dur').value, 10);
+    const repPause = parseInt($('edit-rep-pause').value, 10);
+    if (!name) { alert('Adj meg egy nevet.'); return; }
+    if (!(target >= 1 && target <= 100)) { alert('Cél / szett: 1 és 100 között.'); return; }
+    if (!(targetSets >= 0 && targetSets <= 20)) { alert('Szettszám: 0 és 20 között.'); return; }
+    if (!(restDuration >= 0 && restDuration <= 600)) { alert('Pihenő: 0 és 600 mp között.'); return; }
+    if (!(repDuration >= 0 && repDuration <= 20)) { alert('Idő / ismétlés: 0 és 20 mp között.'); return; }
+    if (!(repPause >= 0 && repPause <= 20)) { alert('Szünet ism. közt: 0 és 20 mp között.'); return; }
+    if (editingProfile) {
+      editingProfile.name = name;
+      editingProfile.target = target;
+      editingProfile.targetSets = targetSets;
+      editingProfile.restDuration = restDuration;
+      editingProfile.repDuration = repDuration;
+      editingProfile.repPause = repPause;
+    } else {
+      profiles.push({ id: 'p' + Date.now(), name, target, targetSets, restDuration, repDuration, repPause });
+    }
+    saveProfiles();
+    closeEditModal();
+    openProfilesModal();
+    render();
+  }
+
+  $('profiles-close').addEventListener('click', closeProfilesModal);
+  $('profiles-new').addEventListener('click', () => openEditModal(null));
+  $('edit-cancel').addEventListener('click', closeEditModal);
+  $('edit-save').addEventListener('click', saveEdit);
+  $('profiles-modal').addEventListener('click', (e) => {
+    if (e.target === $('profiles-modal')) closeProfilesModal();
+  });
+  $('edit-modal').addEventListener('click', (e) => {
+    if (e.target === $('edit-modal')) closeEditModal();
+  });
+
+  // --- Actions ---
+  function ensureToday() {
+    const t = todayStr();
+    if (state.date !== t) {
+      state.date = t;
+      state.reps = 0; state.sets = 0; state.total = 0; state.history = [];
+      state.workoutCompleted = false;
+      stopRest(); stopRepTimer(); stopRepPause(); cancelAutoAdvance();
+    }
+  }
+
+  function stopAllRepFlows() {
+    stopRepTimer();
+    stopRepPause();
+    cancelAutoAdvance();
+  }
+
+  function autoAdvanceRep() {
+    const target = state.settings.target;
+    if (target > 0 && state.reps >= target) return;
+    doIncrement(true);
+  }
+
+  function doIncrement(fromAuto) {
+    ensureToday();
+    // User tap cancels any running flow; auto-advance rep also calls this but flows were already stopped before.
+    stopAllRepFlows();
+
+    const prev = state.reps;
+    state.reps++;
+    state.total++;
+    stopRest();
+
+    const c = $('counter');
+    c.classList.add('tapped');
+    setTimeout(() => c.classList.remove('tapped'), 100);
+    buzz(20);
+
+    const target = state.settings.target;
+    const isTargetHit = (target > 0 && prev < target && state.reps >= target);
+    const hasTempo = state.settings.repDuration > 0;
+    const hasPause = state.settings.repPause > 0;
+    const autoRep = state.settings.autoRep;
+    const autoAdv = state.settings.autoAdvance;
+    const belowTarget = (target <= 0 || state.reps < target);
+
+    // After the rep's tempo (or immediately if no tempo) this fires.
+    const onRepDone = () => {
+      if (isTargetHit) {
+        triggerSetCompleteSignal();
+        if (autoAdv) scheduleAutoAdvance(1500);
+        return;
+      }
+      if (hasPause && belowTarget) {
+        // Pause runs whenever it's configured. If auto-rep is on, advance
+        // automatically after the pause. Otherwise the user taps for the next rep.
+        startRepPause(autoRep ? autoAdvanceRep : null);
+      } else if (autoRep && hasTempo && belowTarget) {
+        // Auto-rep with tempo but no pause — chain directly into next rep
+        autoAdvanceRep();
+      }
+    };
+
+    if (hasTempo) {
+      startRepTimer(onRepDone);
+    } else {
+      speak(state.reps);
+      // Defer onRepDone slightly so the spoken count doesn't collide with the next sound
+      setTimeout(onRepDone, 300);
+    }
+
+    render();
+    if (state.settings.wake) enableKeepAwake();
+    if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+  }
+
+  function increment() { doIncrement(false); }
+
+  function doNewSet(fromAuto) {
+    if (state.reps <= 0) return;
+    stopAllRepFlows();
+    state.history.push(state.reps);
+    state.sets++;
+    state.reps = 0;
+    if (!fromAuto) buzz([40, 60, 40]);
+    const ts = state.settings.targetSets;
+    if (ts > 0 && state.sets >= ts && !state.workoutCompleted) {
+      state.workoutCompleted = true;
+      render();
+      setTimeout(triggerWorkoutComplete, 200);
+    } else {
+      render();
+      startRest();
+    }
+  }
+
+  $('counter').addEventListener('click', increment);
+  $('counter').addEventListener('keydown', (e) => {
+    if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); increment(); }
+  });
+
+  $('minus').addEventListener('click', () => {
+    if (state.reps > 0) {
+      stopAllRepFlows();
+      state.reps--; state.total--;
+      render();
+    }
+  });
+
+  $('new-set').addEventListener('click', () => { doNewSet(false); });
+
+  $('reset').addEventListener('click', () => {
+    if (state.reps || state.sets || state.total) {
+      if (confirm('Biztosan nullázod a mai edzést?')) {
+        state.reps = 0; state.sets = 0; state.total = 0; state.history = [];
+        state.workoutCompleted = false;
+        stopRest(); stopAllRepFlows();
+        if (window.speechSynthesis) speechSynthesis.cancel();
+        render();
+      }
+    }
+  });
+
+  // --- Settings UI ---
+  $('settings-toggle').addEventListener('click', () => {
+    $('settings-panel').classList.toggle('open');
+  });
+
+  function bindToggle(id, key, onChange) {
+    const el = $(id);
+    el.classList.toggle('on', !!state.settings[key]);
+    el.addEventListener('click', () => {
+      state.settings[key] = !state.settings[key];
+      el.classList.toggle('on', state.settings[key]);
+      saveState();
+      if (onChange) onChange(state.settings[key]);
+    });
+  }
+  bindToggle('toggle-voice', 'voice');
+  bindToggle('toggle-vibrate', 'vibrate');
+  bindToggle('toggle-wake', 'wake', (on) => {
+    if (on) enableKeepAwake(); else disableKeepAwake();
+  });
+  bindToggle('toggle-rest', 'rest', (on) => { if (!on) stopRest(); });
+  bindToggle('toggle-countdown', 'countdown');
+  bindToggle('toggle-auto-advance', 'autoAdvance', (on) => { if (!on) cancelAutoAdvance(); });
+  bindToggle('toggle-auto-rep', 'autoRep');
+
+  function updateTargetDisplay() {
+    $('target-value').textContent = state.settings.target === 0 ? 'ki' : state.settings.target;
+    $('target-dec').disabled = state.settings.target <= 0;
+    $('target-inc').disabled = state.settings.target >= 100;
+  }
+  function updateTargetSetsDisplay() {
+    $('target-sets-value').textContent = state.settings.targetSets === 0 ? 'ki' : state.settings.targetSets;
+    $('target-sets-dec').disabled = state.settings.targetSets <= 0;
+    $('target-sets-inc').disabled = state.settings.targetSets >= 20;
+  }
+  function updateRestDisplay() {
+    const s = state.settings.restDuration;
+    $('rest-value').textContent = s === 0 ? 'ki' : (s < 60 ? s + ' mp' : formatTime(s));
+    $('rest-dec').disabled = s <= 0;
+    $('rest-inc').disabled = s >= 600;
+  }
+  function updateRepDurDisplay() {
+    const s = state.settings.repDuration;
+    $('rep-dur-value').textContent = s === 0 ? 'ki' : s + ' mp';
+    $('rep-dur-dec').disabled = s <= 0;
+    $('rep-dur-inc').disabled = s >= 20;
+  }
+  function updateRepPauseDisplay() {
+    const s = state.settings.repPause;
+    $('rep-pause-value').textContent = s === 0 ? 'ki' : s + ' mp';
+    $('rep-pause-dec').disabled = s <= 0;
+    $('rep-pause-inc').disabled = s >= 20;
+  }
+  $('target-dec').addEventListener('click', () => {
+    state.settings.target = Math.max(0, state.settings.target - 1);
+    updateTargetDisplay(); render();
+  });
+  $('target-inc').addEventListener('click', () => {
+    state.settings.target = Math.min(100, state.settings.target + 1);
+    updateTargetDisplay(); render();
+  });
+  $('target-sets-dec').addEventListener('click', () => {
+    state.settings.targetSets = Math.max(0, state.settings.targetSets - 1);
+    updateTargetSetsDisplay(); render();
+  });
+  $('target-sets-inc').addEventListener('click', () => {
+    state.settings.targetSets = Math.min(20, state.settings.targetSets + 1);
+    updateTargetSetsDisplay(); render();
+  });
+  $('rest-dec').addEventListener('click', () => {
+    state.settings.restDuration = Math.max(0, state.settings.restDuration - 15);
+    updateRestDisplay(); saveState();
+  });
+  $('rest-inc').addEventListener('click', () => {
+    state.settings.restDuration = Math.min(600, state.settings.restDuration + 15);
+    updateRestDisplay(); saveState();
+  });
+  $('rep-dur-dec').addEventListener('click', () => {
+    state.settings.repDuration = Math.max(0, state.settings.repDuration - 1);
+    updateRepDurDisplay(); saveState();
+  });
+  $('rep-dur-inc').addEventListener('click', () => {
+    state.settings.repDuration = Math.min(20, state.settings.repDuration + 1);
+    updateRepDurDisplay(); saveState();
+  });
+  $('rep-pause-dec').addEventListener('click', () => {
+    state.settings.repPause = Math.max(0, state.settings.repPause - 1);
+    updateRepPauseDisplay(); saveState();
+  });
+  $('rep-pause-inc').addEventListener('click', () => {
+    state.settings.repPause = Math.min(20, state.settings.repPause + 1);
+    updateRepPauseDisplay(); saveState();
+  });
+
+  updateTargetDisplay();
+  updateTargetSetsDisplay();
+  updateRestDisplay();
+  updateRepDurDisplay();
+  updateRepPauseDisplay();
+  render();
+  if (state.settings.wake) enableKeepAwake();
+})();
+</script>
+</body>
+</html>
