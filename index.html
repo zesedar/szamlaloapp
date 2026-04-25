@@ -104,6 +104,48 @@
     border-radius: 8px;
   }
   .icon-btn:active { background: var(--bg-soft); }
+  .header-actions {
+    display: flex;
+    gap: 2px;
+    align-items: center;
+  }
+  .queue-banner {
+    display: none;
+    background: var(--success-bg);
+    color: var(--text);
+    border-radius: 10px;
+    padding: 8px 12px;
+    font-size: 13px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .queue-banner.on { display: flex; }
+  .queue-banner-info { flex: 1; min-width: 0; }
+  .queue-banner-step {
+    font-size: 11px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .queue-banner-name {
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .queue-banner-stop {
+    background: transparent;
+    border: 0.5px solid var(--border-strong);
+    color: var(--text-muted);
+    border-radius: 7px;
+    padding: 4px 10px;
+    font-size: 12px;
+    font-family: inherit;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .queue-banner-stop:active { background: var(--bg-tap); }
   .profiles {
     display: flex;
     gap: 6px;
@@ -454,6 +496,119 @@
     font-family: inherit;
   }
   .icon-mini-btn:active { background: var(--bg-tap); }
+  .icon-mini-btn.danger { color: #c43c3c; border-color: rgba(196,60,60,0.4); }
+  /* Log list */
+  .log-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 12px;
+    max-height: 60vh;
+    overflow-y: auto;
+  }
+  .log-item {
+    background: var(--bg-soft);
+    border-radius: 10px;
+    padding: 10px 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .log-info { flex: 1; min-width: 0; }
+  .log-when {
+    font-size: 11px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-variant-numeric: tabular-nums;
+  }
+  .log-title {
+    font-size: 14px;
+    font-weight: 500;
+    margin-top: 2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .log-detail {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 2px;
+    font-variant-numeric: tabular-nums;
+    word-break: break-word;
+  }
+  .log-queue-tag {
+    display: inline-block;
+    font-size: 10px;
+    background: var(--bg-tap);
+    color: var(--text-muted);
+    border-radius: 4px;
+    padding: 1px 6px;
+    margin-right: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+  }
+  /* Queue editor */
+  .queue-step-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 8px 0 12px;
+  }
+  .queue-step-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--bg-soft);
+    border-radius: 10px;
+    padding: 8px 10px;
+  }
+  .queue-step-num {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+    min-width: 22px;
+  }
+  .queue-step-name {
+    flex: 1;
+    font-size: 14px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .queue-step-name.missing { color: var(--accent); font-style: italic; }
+  .queue-add-row {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 12px;
+  }
+  .queue-add-select {
+    flex: 1;
+    background: var(--bg-soft);
+    border: 0.5px solid var(--border-strong);
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 14px;
+    color: var(--text);
+    font-family: inherit;
+  }
+  .queue-list-empty, .log-list-empty {
+    color: var(--text-muted);
+    font-size: 13px;
+    text-align: center;
+    padding: 20px 0;
+  }
+  .chip.queue-chip {
+    background: var(--success-bg);
+    border-color: var(--success);
+    color: var(--text);
+  }
+  .chip.queue-chip.active {
+    background: var(--success);
+    color: var(--bg);
+    border-color: var(--success);
+  }
   #keep-awake-video {
     position: fixed;
     width: 2px;
@@ -473,15 +628,21 @@
       <span class="wake-indicator" id="wake-indicator" title="Képernyő-ébrentartás állapota"></span>
       <span id="date-title">Mai edzés</span>
     </div>
-    <button class="icon-btn" id="settings-toggle" aria-label="Beállítások">⚙</button>
+    <div class="header-actions">
+      <button class="icon-btn" id="log-toggle" aria-label="Napló" title="Edzésnapló">📅</button>
+      <button class="icon-btn" id="queue-toggle" aria-label="Feladatsor" title="Feladatsorok">📋</button>
+      <button class="icon-btn" id="settings-toggle" aria-label="Beállítások">⚙</button>
+    </div>
   </div>
+
+  <div class="queue-banner" id="queue-banner"></div>
 
   <div class="profiles" id="profiles"></div>
 
   <div class="settings-panel" id="settings-panel">
     <div class="section-label">Szett</div>
     <div class="setting-row">
-      <span>Cél / szett <span style="color:var(--text-faint);font-size:12px;">(0 = nincs)</span></span>
+      <span>Ismétlés szám <span style="color:var(--text-faint);font-size:12px;">(0 = nincs)</span></span>
       <div class="stepper">
         <button class="step-btn" id="target-dec">−</button>
         <span class="step-value" id="target-value">10</span>
@@ -612,7 +773,7 @@
       <input type="number" class="modal-input" id="edit-target" min="1" max="100" inputmode="numeric">
     </div>
     <div class="modal-row">
-      <span>Cél szettszám</span>
+      <span>Cél ismétlésszám</span>
       <input type="number" class="modal-input" id="edit-sets" min="0" max="20" inputmode="numeric">
     </div>
     <div class="modal-row">
@@ -627,9 +788,55 @@
       <span>Szünet ism. közt (mp)</span>
       <input type="number" class="modal-input" id="edit-rep-pause" min="0" max="20" inputmode="numeric">
     </div>
+    <div class="modal-row">
+      <span>Auto-ismétlés</span>
+      <div class="toggle" id="edit-auto-rep" role="switch"></div>
+    </div>
     <div class="modal-actions">
       <button class="btn btn-small" id="edit-cancel">Mégse</button>
       <button class="btn btn-primary btn-small" id="edit-save">Mentés</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="log-modal">
+  <div class="modal">
+    <h2 class="modal-title">Edzésnapló</h2>
+    <div class="log-list" id="log-list"></div>
+    <div class="modal-actions">
+      <button class="btn btn-small" id="log-clear">Összes törlése</button>
+      <button class="btn btn-primary btn-small" id="log-close">Bezár</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="queue-modal">
+  <div class="modal">
+    <h2 class="modal-title">Feladatsorok</h2>
+    <div class="profile-list" id="queue-list"></div>
+    <div class="modal-actions">
+      <button class="btn btn-small" id="queue-close">Bezár</button>
+      <button class="btn btn-primary btn-small" id="queue-new">Új feladatsor</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="queue-edit-modal">
+  <div class="modal">
+    <h2 class="modal-title" id="queue-edit-title">Új feladatsor</h2>
+    <div class="modal-row">
+      <span>Név</span>
+      <input type="text" class="modal-input" id="queue-edit-name" maxlength="24" placeholder="pl. Hétfő – mell + tricepsz">
+    </div>
+    <div class="section-label" style="margin-top: 8px;">Lépések</div>
+    <div class="queue-step-list" id="queue-step-list"></div>
+    <div class="queue-add-row">
+      <select class="queue-add-select" id="queue-add-select"></select>
+      <button class="btn btn-small btn-primary" id="queue-add-btn">+ Hozzáad</button>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-small" id="queue-edit-cancel">Mégse</button>
+      <button class="btn btn-primary btn-small" id="queue-edit-save">Mentés</button>
     </div>
   </div>
 </div>
@@ -644,6 +851,8 @@ if ('serviceWorker' in navigator) {
 (function() {
   const STATE_KEY = 'ismetles-szamlalo-v6';
   const PROFILES_KEY = 'ismetles-profilok-v3';
+  const LOG_KEY = 'ismetles-naplo-v1';
+  const QUEUES_KEY = 'ismetles-feladatsorok-v1';
   const todayStr = () => new Date().toISOString().slice(0, 10);
 
   const DEFAULTS = {
@@ -666,10 +875,13 @@ if ('serviceWorker' in navigator) {
     history: [],
     activeProfileId: null,
     workoutCompleted: false,
+    queueState: null,
     settings: Object.assign({}, DEFAULTS)
   };
 
   let profiles = DEFAULT_PROFILES.slice();
+  let workoutLog = [];
+  let queues = [];
 
   try {
     const saved = JSON.parse(localStorage.getItem(STATE_KEY) || 'null');
@@ -682,6 +894,7 @@ if ('serviceWorker' in navigator) {
         state.history = saved.history || [];
         state.activeProfileId = saved.activeProfileId || null;
         state.workoutCompleted = !!saved.workoutCompleted;
+        state.queueState = saved.queueState || null;
       }
     }
   } catch (e) {}
@@ -691,8 +904,20 @@ if ('serviceWorker' in navigator) {
     if (Array.isArray(sp)) profiles = sp.map(p => Object.assign({repDuration: 0, repPause: 0}, p));
   } catch (e) {}
 
+  try {
+    const sl = JSON.parse(localStorage.getItem(LOG_KEY) || 'null');
+    if (Array.isArray(sl)) workoutLog = sl;
+  } catch (e) {}
+
+  try {
+    const sq = JSON.parse(localStorage.getItem(QUEUES_KEY) || 'null');
+    if (Array.isArray(sq)) queues = sq;
+  } catch (e) {}
+
   function saveState() { try { localStorage.setItem(STATE_KEY, JSON.stringify(state)); } catch (e) {} }
   function saveProfiles() { try { localStorage.setItem(PROFILES_KEY, JSON.stringify(profiles)); } catch (e) {} }
+  function saveWorkoutLog() { try { localStorage.setItem(LOG_KEY, JSON.stringify(workoutLog)); } catch (e) {} }
+  function saveQueues() { try { localStorage.setItem(QUEUES_KEY, JSON.stringify(queues)); } catch (e) {} }
 
   const $ = id => document.getElementById(id);
 
@@ -1039,16 +1264,163 @@ if ('serviceWorker' in navigator) {
     setTimeout(() => c.classList.remove('target-hit'), 1200);
   }
 
+  function createLogEntry() {
+    const profile = state.activeProfileId
+      ? profiles.find(p => p.id === state.activeProfileId)
+      : null;
+    return {
+      id: 'log' + Date.now() + Math.floor(Math.random() * 1000),
+      timestamp: Date.now(),
+      profileId: state.activeProfileId || null,
+      profileName: profile ? profile.name : null,
+      target: state.settings.target,
+      targetSets: state.settings.targetSets,
+      actualSets: state.sets,
+      history: state.history.slice(),
+      totalReps: state.total,
+      queueName: state.queueState ? state.queueState.name : null,
+      queueStep: state.queueState ? state.queueState.index + 1 : null,
+      queueTotal: state.queueState ? state.queueState.steps.length : null
+    };
+  }
+
+  function appendToLog(entry) {
+    workoutLog.unshift(entry);
+    if (workoutLog.length > 200) workoutLog.length = 200;
+    saveWorkoutLog();
+  }
+
+  function autoResetAfterWorkout() {
+    state.reps = 0;
+    state.sets = 0;
+    state.total = 0;
+    state.history = [];
+    state.workoutCompleted = false;
+    state.queueState = null;
+    stopRest();
+    stopAllRepFlows();
+    if (window.speechSynthesis) speechSynthesis.cancel();
+    $('stat-sets').classList.remove('workout-done');
+    render();
+  }
+
+  function advanceQueue() {
+    if (!state.queueState) return;
+    state.queueState.index++;
+    if (state.queueState.index >= state.queueState.steps.length) {
+      // Should not happen if triggerWorkoutComplete handles last step,
+      // but guard anyway:
+      autoResetAfterWorkout();
+      return;
+    }
+    const nextProfileId = state.queueState.steps[state.queueState.index];
+    const profile = profiles.find(p => p.id === nextProfileId);
+    if (!profile) {
+      // Profile was deleted, stop the queue
+      autoResetAfterWorkout();
+      return;
+    }
+    // Reset counter state but keep queue state
+    state.reps = 0;
+    state.sets = 0;
+    state.total = 0;
+    state.history = [];
+    state.workoutCompleted = false;
+    $('stat-sets').classList.remove('workout-done');
+    // Apply next profile's settings
+    state.settings.target = profile.target;
+    state.settings.targetSets = profile.targetSets || 0;
+    state.settings.restDuration = profile.restDuration;
+    state.settings.repDuration = profile.repDuration || 0;
+    state.settings.repPause = profile.repPause || 0;
+    if (typeof profile.autoRep === 'boolean') {
+      state.settings.autoRep = profile.autoRep;
+      $('toggle-auto-rep').classList.toggle('on', !!profile.autoRep);
+    }
+    state.activeProfileId = profile.id;
+    updateTargetDisplay();
+    updateTargetSetsDisplay();
+    updateRestDisplay();
+    updateRepDurDisplay();
+    updateRepPauseDisplay();
+    // Start the rest timer between exercises so the user has time to set up
+    startRest();
+    render();
+  }
+
   function triggerWorkoutComplete() {
-    buzz([200, 80, 200, 80, 200, 80, 400]);
-    setTimeout(() => beep(660, 140), 0);
-    setTimeout(() => beep(880, 140), 160);
-    setTimeout(() => beep(1320, 400), 320);
-    setTimeout(() => speak('edzés kész', 1.0), 800);
-    $('stat-sets').classList.add('workout-done');
+    // Always log the completed unit
+    appendToLog(createLogEntry());
+
+    const inQueue = state.queueState && state.queueState.steps && state.queueState.steps.length > 0;
+    const hasMoreSteps = inQueue && state.queueState.index + 1 < state.queueState.steps.length;
+
+    if (hasMoreSteps) {
+      // Step complete signal, then advance to the next exercise
+      const nextProfileId = state.queueState.steps[state.queueState.index + 1];
+      const nextProfile = profiles.find(p => p.id === nextProfileId);
+      const nextName = nextProfile ? nextProfile.name : 'következő gyakorlat';
+      buzz([100, 60, 100, 60, 200]);
+      beep(660, 130);
+      setTimeout(() => beep(880, 200), 170);
+      setTimeout(() => speak('Gyakorlat kész. Jöhet: ' + nextName, 1.0), 500);
+      $('stat-sets').classList.add('workout-done');
+      setTimeout(() => {
+        $('stat-sets').classList.remove('workout-done');
+        advanceQueue();
+      }, 4500);
+    } else {
+      // Final completion: full workout done
+      buzz([200, 80, 200, 80, 200, 80, 400]);
+      setTimeout(() => beep(660, 140), 0);
+      setTimeout(() => beep(880, 140), 160);
+      setTimeout(() => beep(1320, 400), 320);
+      setTimeout(() => speak('edzés kész', 1.0), 800);
+      $('stat-sets').classList.add('workout-done');
+      // Auto reset so the next workout starts fresh
+      setTimeout(autoResetAfterWorkout, 6000);
+    }
   }
 
   // --- Render ---
+  function renderQueueBanner() {
+    const banner = $('queue-banner');
+    if (!banner) return;
+    if (!state.queueState || !state.queueState.steps || state.queueState.steps.length === 0) {
+      banner.classList.remove('on');
+      banner.innerHTML = '';
+      return;
+    }
+    const qs = state.queueState;
+    const idx = qs.index;
+    const total = qs.steps.length;
+    const currentProfile = profiles.find(p => p.id === qs.steps[idx]);
+    const currentName = currentProfile ? currentProfile.name : '— törölt —';
+    banner.innerHTML = '';
+    const info = document.createElement('div');
+    info.className = 'queue-banner-info';
+    const step = document.createElement('div');
+    step.className = 'queue-banner-step';
+    step.textContent = qs.name + ' · ' + (idx + 1) + '/' + total;
+    const name = document.createElement('div');
+    name.className = 'queue-banner-name';
+    name.textContent = currentName;
+    info.appendChild(step);
+    info.appendChild(name);
+    const stop = document.createElement('button');
+    stop.className = 'queue-banner-stop';
+    stop.textContent = 'Megáll';
+    stop.addEventListener('click', () => {
+      if (confirm('Megszakítod a feladatsort?')) {
+        state.queueState = null;
+        render();
+      }
+    });
+    banner.appendChild(info);
+    banner.appendChild(stop);
+    banner.classList.add('on');
+  }
+
   function render() {
     $('reps').textContent = state.reps;
     const targetSets = state.settings.targetSets;
@@ -1065,6 +1437,7 @@ if ('serviceWorker' in navigator) {
     if (state.workoutCompleted) statSets.classList.add('workout-done');
     else statSets.classList.remove('workout-done');
     renderProfiles();
+    renderQueueBanner();
     saveState();
   }
 
@@ -1072,9 +1445,19 @@ if ('serviceWorker' in navigator) {
   function renderProfiles() {
     const el = $('profiles');
     el.innerHTML = '';
+    // Queue chips first (visually distinct)
+    const activeQueueId = state.queueState ? state.queueState.queueId : null;
+    queues.forEach(q => {
+      const chip = document.createElement('button');
+      chip.className = 'chip queue-chip' + (activeQueueId === q.id ? ' active' : '');
+      chip.textContent = '▸ ' + q.name;
+      chip.title = 'Feladatsor indítása';
+      chip.addEventListener('click', () => startQueue(q));
+      el.appendChild(chip);
+    });
     profiles.forEach(p => {
       const chip = document.createElement('button');
-      chip.className = 'chip' + (state.activeProfileId === p.id ? ' active' : '');
+      chip.className = 'chip' + (state.activeProfileId === p.id && !activeQueueId ? ' active' : '');
       chip.textContent = p.name;
       chip.addEventListener('click', () => applyProfile(p));
       el.appendChild(chip);
@@ -1088,11 +1471,17 @@ if ('serviceWorker' in navigator) {
   }
 
   function applyProfile(p) {
+    // Manual profile selection cancels any running queue
+    if (state.queueState) state.queueState = null;
     state.settings.target = p.target;
     state.settings.targetSets = p.targetSets || 0;
     state.settings.restDuration = p.restDuration;
     state.settings.repDuration = p.repDuration || 0;
     state.settings.repPause = p.repPause || 0;
+    if (typeof p.autoRep === 'boolean') {
+      state.settings.autoRep = p.autoRep;
+      $('toggle-auto-rep').classList.toggle('on', !!p.autoRep);
+    }
     state.activeProfileId = p.id;
     updateTargetDisplay();
     updateTargetSetsDisplay();
@@ -1127,8 +1516,11 @@ if ('serviceWorker' in navigator) {
       if (p.repDuration > 0) {
         tempoPart = ' · ' + p.repDuration + ' mp/ism';
         if (p.repPause > 0) tempoPart += ' + ' + p.repPause + ' mp sz.';
+      } else if (p.repPause > 0) {
+        tempoPart = ' · ' + p.repPause + ' mp sz.';
       }
-      detail.textContent = setsPart + p.target + ' ism · ' + formatTime(p.restDuration) + ' pihenő' + tempoPart;
+      const autoPart = p.autoRep ? ' · auto' : '';
+      detail.textContent = setsPart + p.target + ' ism · ' + formatTime(p.restDuration) + ' pihenő' + tempoPart + autoPart;
       info.appendChild(name); info.appendChild(detail);
       const actions = document.createElement('div');
       actions.className = 'profile-actions';
@@ -1167,11 +1559,17 @@ if ('serviceWorker' in navigator) {
     $('edit-rest').value = p ? p.restDuration : 90;
     $('edit-rep-dur').value = p ? (p.repDuration || 0) : 0;
     $('edit-rep-pause').value = p ? (p.repPause || 0) : 0;
+    const autoRepInitial = p && typeof p.autoRep === 'boolean' ? p.autoRep : false;
+    $('edit-auto-rep').classList.toggle('on', !!autoRepInitial);
     closeProfilesModal();
     $('edit-modal').classList.add('open');
     setTimeout(() => $('edit-name').focus(), 50);
   }
   function closeEditModal() { $('edit-modal').classList.remove('open'); editingProfile = null; }
+  // The edit-modal toggle just flips a class; saveEdit reads it.
+  $('edit-auto-rep').addEventListener('click', () => {
+    $('edit-auto-rep').classList.toggle('on');
+  });
   function saveEdit() {
     const name = ($('edit-name').value || '').trim();
     const target = parseInt($('edit-target').value, 10);
@@ -1179,6 +1577,7 @@ if ('serviceWorker' in navigator) {
     const restDuration = parseInt($('edit-rest').value, 10);
     const repDuration = parseInt($('edit-rep-dur').value, 10);
     const repPause = parseInt($('edit-rep-pause').value, 10);
+    const autoRep = $('edit-auto-rep').classList.contains('on');
     if (!name) { alert('Adj meg egy nevet.'); return; }
     if (!(target >= 1 && target <= 100)) { alert('Cél / szett: 1 és 100 között.'); return; }
     if (!(targetSets >= 0 && targetSets <= 20)) { alert('Szettszám: 0 és 20 között.'); return; }
@@ -1192,8 +1591,24 @@ if ('serviceWorker' in navigator) {
       editingProfile.restDuration = restDuration;
       editingProfile.repDuration = repDuration;
       editingProfile.repPause = repPause;
+      editingProfile.autoRep = autoRep;
+      // If this profile is currently active, propagate live changes
+      if (state.activeProfileId === editingProfile.id) {
+        state.settings.target = target;
+        state.settings.targetSets = targetSets;
+        state.settings.restDuration = restDuration;
+        state.settings.repDuration = repDuration;
+        state.settings.repPause = repPause;
+        state.settings.autoRep = autoRep;
+        $('toggle-auto-rep').classList.toggle('on', !!autoRep);
+        updateTargetDisplay();
+        updateTargetSetsDisplay();
+        updateRestDisplay();
+        updateRepDurDisplay();
+        updateRepPauseDisplay();
+      }
     } else {
-      profiles.push({ id: 'p' + Date.now(), name, target, targetSets, restDuration, repDuration, repPause });
+      profiles.push({ id: 'p' + Date.now(), name, target, targetSets, restDuration, repDuration, repPause, autoRep });
     }
     saveProfiles();
     closeEditModal();
@@ -1212,6 +1627,376 @@ if ('serviceWorker' in navigator) {
     if (e.target === $('edit-modal')) closeEditModal();
   });
 
+  // --- Workout log UI ---
+  function formatLogTime(ts) {
+    const d = new Date(ts);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const yest = new Date(today.getTime() - 86400000);
+    const dayStart = new Date(d);
+    dayStart.setHours(0, 0, 0, 0);
+    const time = d.toLocaleTimeString('hu-HU', { hour: '2-digit', minute: '2-digit' });
+    if (dayStart.getTime() === today.getTime()) return 'Ma · ' + time;
+    if (dayStart.getTime() === yest.getTime()) return 'Tegnap · ' + time;
+    return d.toLocaleDateString('hu-HU', { month: 'short', day: 'numeric' }) + ' · ' + time;
+  }
+
+  function renderLogList() {
+    const list = $('log-list');
+    list.innerHTML = '';
+    if (workoutLog.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'log-list-empty';
+      empty.textContent = 'Még nincsenek bejegyzések. A napló automatikusan frissül, amikor egy edzés véget ér.';
+      list.appendChild(empty);
+      return;
+    }
+    workoutLog.forEach(entry => {
+      const item = document.createElement('div');
+      item.className = 'log-item';
+
+      const info = document.createElement('div');
+      info.className = 'log-info';
+
+      const when = document.createElement('div');
+      when.className = 'log-when';
+      when.textContent = formatLogTime(entry.timestamp);
+      info.appendChild(when);
+
+      const title = document.createElement('div');
+      title.className = 'log-title';
+      if (entry.queueName) {
+        const tag = document.createElement('span');
+        tag.className = 'log-queue-tag';
+        tag.textContent = entry.queueStep + '/' + entry.queueTotal;
+        title.appendChild(tag);
+        title.appendChild(document.createTextNode(
+          (entry.profileName || '—') + ' · ' + entry.queueName
+        ));
+      } else {
+        title.textContent = entry.profileName || 'Egyedi edzés';
+      }
+      info.appendChild(title);
+
+      const detail = document.createElement('div');
+      detail.className = 'log-detail';
+      const setsPart = entry.actualSets + (entry.targetSets > 0 ? '/' + entry.targetSets : '') + ' ism';
+      const targetPart = entry.target > 0 ? ' · cél: ' + entry.target : '';
+      const histPart = entry.history && entry.history.length
+        ? ' · ' + entry.history.join(' · ')
+        : '';
+      const totalPart = ' · össz ' + entry.totalReps;
+      detail.textContent = setsPart + targetPart + histPart + totalPart;
+      info.appendChild(detail);
+
+      const delBtn = document.createElement('button');
+      delBtn.className = 'icon-mini-btn';
+      delBtn.textContent = '×';
+      delBtn.title = 'Bejegyzés törlése';
+      delBtn.addEventListener('click', () => {
+        workoutLog = workoutLog.filter(e => e.id !== entry.id);
+        saveWorkoutLog();
+        renderLogList();
+      });
+
+      item.appendChild(info);
+      item.appendChild(delBtn);
+      list.appendChild(item);
+    });
+  }
+
+  function openLogModal() { renderLogList(); $('log-modal').classList.add('open'); }
+  function closeLogModal() { $('log-modal').classList.remove('open'); }
+
+  $('log-toggle').addEventListener('click', openLogModal);
+  $('log-close').addEventListener('click', closeLogModal);
+  $('log-clear').addEventListener('click', () => {
+    if (workoutLog.length === 0) return;
+    if (confirm('Törlöd az összes naplóbejegyzést?')) {
+      workoutLog = [];
+      saveWorkoutLog();
+      renderLogList();
+    }
+  });
+  $('log-modal').addEventListener('click', (e) => {
+    if (e.target === $('log-modal')) closeLogModal();
+  });
+
+  // --- Queue UI (list + editor) ---
+  function startQueue(queue) {
+    if (!queue.steps || queue.steps.length === 0) {
+      alert('Ennek a feladatsornak nincsenek lépései.');
+      return;
+    }
+    const first = profiles.find(p => p.id === queue.steps[0]);
+    if (!first) {
+      alert('A feladatsor első gyakorlata nem található. Szerkeszd a feladatsort.');
+      return;
+    }
+    if (state.reps || state.sets) {
+      if (!confirm('Egy edzés van folyamatban. Új feladatsor indítása nullázza azt. Folytatod?')) return;
+    }
+    // Reset counter, then apply first profile
+    state.reps = 0;
+    state.sets = 0;
+    state.total = 0;
+    state.history = [];
+    state.workoutCompleted = false;
+    stopRest(); stopAllRepFlows();
+    if (window.speechSynthesis) speechSynthesis.cancel();
+    $('stat-sets').classList.remove('workout-done');
+
+    state.queueState = {
+      queueId: queue.id,
+      name: queue.name,
+      steps: queue.steps.slice(),
+      index: 0
+    };
+    state.settings.target = first.target;
+    state.settings.targetSets = first.targetSets || 0;
+    state.settings.restDuration = first.restDuration;
+    state.settings.repDuration = first.repDuration || 0;
+    state.settings.repPause = first.repPause || 0;
+    if (typeof first.autoRep === 'boolean') {
+      state.settings.autoRep = first.autoRep;
+      $('toggle-auto-rep').classList.toggle('on', !!first.autoRep);
+    }
+    state.activeProfileId = first.id;
+    updateTargetDisplay();
+    updateTargetSetsDisplay();
+    updateRestDisplay();
+    updateRepDurDisplay();
+    updateRepPauseDisplay();
+    closeQueueModal();
+    render();
+    // Spoken cue so the user knows the first exercise
+    setTimeout(() => speak('Indul: ' + first.name, 1.0), 200);
+  }
+
+  function renderQueueList() {
+    const list = $('queue-list');
+    list.innerHTML = '';
+    if (queues.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'profile-list-empty';
+      empty.textContent = 'Még nincsenek feladatsorok. Hozz létre egyet a sablonjaidból.';
+      list.appendChild(empty);
+      return;
+    }
+    queues.forEach(q => {
+      const item = document.createElement('div');
+      item.className = 'profile-item';
+
+      const info = document.createElement('div');
+      info.className = 'profile-info';
+      const name = document.createElement('div');
+      name.className = 'profile-name';
+      name.textContent = q.name;
+      const detail = document.createElement('div');
+      detail.className = 'profile-detail';
+      const stepNames = (q.steps || []).map(sid => {
+        const p = profiles.find(x => x.id === sid);
+        return p ? p.name : '— törölt —';
+      });
+      detail.textContent = (q.steps || []).length + ' lépés' +
+        (stepNames.length ? ' · ' + stepNames.join(' → ') : '');
+      info.appendChild(name);
+      info.appendChild(detail);
+
+      const actions = document.createElement('div');
+      actions.className = 'profile-actions';
+      const startBtn = document.createElement('button');
+      startBtn.className = 'icon-mini-btn';
+      startBtn.textContent = '▸ Indít';
+      startBtn.addEventListener('click', () => startQueue(q));
+      const editBtn = document.createElement('button');
+      editBtn.className = 'icon-mini-btn';
+      editBtn.textContent = 'Szerk';
+      editBtn.addEventListener('click', () => openQueueEditModal(q));
+      const delBtn = document.createElement('button');
+      delBtn.className = 'icon-mini-btn';
+      delBtn.textContent = 'Töröl';
+      delBtn.addEventListener('click', () => {
+        if (confirm('Törlöd: "' + q.name + '"?')) {
+          queues = queues.filter(x => x.id !== q.id);
+          if (state.queueState && state.queueState.queueId === q.id) {
+            state.queueState = null;
+          }
+          saveQueues();
+          renderQueueList();
+          render();
+        }
+      });
+      actions.appendChild(startBtn);
+      actions.appendChild(editBtn);
+      actions.appendChild(delBtn);
+
+      item.appendChild(info);
+      item.appendChild(actions);
+      list.appendChild(item);
+    });
+  }
+
+  function openQueueModal() { renderQueueList(); $('queue-modal').classList.add('open'); }
+  function closeQueueModal() { $('queue-modal').classList.remove('open'); }
+
+  $('queue-toggle').addEventListener('click', openQueueModal);
+  $('queue-close').addEventListener('click', closeQueueModal);
+  $('queue-modal').addEventListener('click', (e) => {
+    if (e.target === $('queue-modal')) closeQueueModal();
+  });
+
+  // Queue editor
+  let editingQueue = null;
+  let editingSteps = []; // working copy of profile ids
+
+  function renderQueueStepsList() {
+    const list = $('queue-step-list');
+    list.innerHTML = '';
+    if (editingSteps.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'profile-list-empty';
+      empty.style.padding = '8px 0';
+      empty.textContent = 'Még nincs egyetlen lépés sem.';
+      list.appendChild(empty);
+      return;
+    }
+    editingSteps.forEach((pid, idx) => {
+      const item = document.createElement('div');
+      item.className = 'queue-step-item';
+      const num = document.createElement('span');
+      num.className = 'queue-step-num';
+      num.textContent = (idx + 1) + '.';
+      const name = document.createElement('span');
+      name.className = 'queue-step-name';
+      const profile = profiles.find(p => p.id === pid);
+      if (profile) {
+        name.textContent = profile.name;
+      } else {
+        name.textContent = '— törölt profil —';
+        name.classList.add('missing');
+      }
+      const upBtn = document.createElement('button');
+      upBtn.className = 'icon-mini-btn';
+      upBtn.textContent = '↑';
+      upBtn.title = 'Fel';
+      upBtn.disabled = idx === 0;
+      if (idx === 0) upBtn.style.opacity = '0.35';
+      upBtn.addEventListener('click', () => {
+        if (idx === 0) return;
+        const tmp = editingSteps[idx - 1];
+        editingSteps[idx - 1] = editingSteps[idx];
+        editingSteps[idx] = tmp;
+        renderQueueStepsList();
+      });
+      const downBtn = document.createElement('button');
+      downBtn.className = 'icon-mini-btn';
+      downBtn.textContent = '↓';
+      downBtn.title = 'Le';
+      downBtn.disabled = idx === editingSteps.length - 1;
+      if (idx === editingSteps.length - 1) downBtn.style.opacity = '0.35';
+      downBtn.addEventListener('click', () => {
+        if (idx === editingSteps.length - 1) return;
+        const tmp = editingSteps[idx + 1];
+        editingSteps[idx + 1] = editingSteps[idx];
+        editingSteps[idx] = tmp;
+        renderQueueStepsList();
+      });
+      const delBtn = document.createElement('button');
+      delBtn.className = 'icon-mini-btn danger';
+      delBtn.textContent = '×';
+      delBtn.title = 'Törlés';
+      delBtn.addEventListener('click', () => {
+        editingSteps.splice(idx, 1);
+        renderQueueStepsList();
+      });
+
+      item.appendChild(num);
+      item.appendChild(name);
+      item.appendChild(upBtn);
+      item.appendChild(downBtn);
+      item.appendChild(delBtn);
+      list.appendChild(item);
+    });
+  }
+
+  function populateQueueProfileSelect() {
+    const sel = $('queue-add-select');
+    sel.innerHTML = '';
+    if (profiles.length === 0) {
+      const opt = document.createElement('option');
+      opt.textContent = '— nincs sablon —';
+      opt.disabled = true;
+      sel.appendChild(opt);
+      return;
+    }
+    profiles.forEach(p => {
+      const opt = document.createElement('option');
+      opt.value = p.id;
+      opt.textContent = p.name;
+      sel.appendChild(opt);
+    });
+  }
+
+  function openQueueEditModal(q) {
+    editingQueue = q || null;
+    editingSteps = q ? (q.steps || []).slice() : [];
+    $('queue-edit-title').textContent = q ? 'Feladatsor szerkesztése' : 'Új feladatsor';
+    $('queue-edit-name').value = q ? q.name : '';
+    populateQueueProfileSelect();
+    renderQueueStepsList();
+    closeQueueModal();
+    $('queue-edit-modal').classList.add('open');
+    setTimeout(() => $('queue-edit-name').focus(), 50);
+  }
+
+  function closeQueueEditModal() {
+    $('queue-edit-modal').classList.remove('open');
+    editingQueue = null;
+    editingSteps = [];
+  }
+
+  function saveQueueEdit() {
+    const name = ($('queue-edit-name').value || '').trim();
+    if (!name) { alert('Adj meg egy nevet.'); return; }
+    if (editingSteps.length === 0) {
+      alert('Legalább egy lépést adj hozzá.');
+      return;
+    }
+    if (editingQueue) {
+      editingQueue.name = name;
+      editingQueue.steps = editingSteps.slice();
+      // Sync the running queue if it's this one
+      if (state.queueState && state.queueState.queueId === editingQueue.id) {
+        state.queueState.name = name;
+      }
+    } else {
+      queues.push({
+        id: 'q' + Date.now(),
+        name,
+        steps: editingSteps.slice()
+      });
+    }
+    saveQueues();
+    closeQueueEditModal();
+    openQueueModal();
+    render();
+  }
+
+  $('queue-new').addEventListener('click', () => openQueueEditModal(null));
+  $('queue-edit-cancel').addEventListener('click', closeQueueEditModal);
+  $('queue-edit-save').addEventListener('click', saveQueueEdit);
+  $('queue-add-btn').addEventListener('click', () => {
+    const sel = $('queue-add-select');
+    const pid = sel.value;
+    if (!pid) return;
+    editingSteps.push(pid);
+    renderQueueStepsList();
+  });
+  $('queue-edit-modal').addEventListener('click', (e) => {
+    if (e.target === $('queue-edit-modal')) closeQueueEditModal();
+  });
+
   // --- Actions ---
   function ensureToday() {
     const t = todayStr();
@@ -1219,6 +2004,7 @@ if ('serviceWorker' in navigator) {
       state.date = t;
       state.reps = 0; state.sets = 0; state.total = 0; state.history = [];
       state.workoutCompleted = false;
+      state.queueState = null;
       stopRest(); stopRepTimer(); stopRepPause(); cancelAutoAdvance();
     }
   }
@@ -1324,12 +2110,14 @@ if ('serviceWorker' in navigator) {
   $('new-set').addEventListener('click', () => { doNewSet(false); });
 
   $('reset').addEventListener('click', () => {
-    if (state.reps || state.sets || state.total) {
+    if (state.reps || state.sets || state.total || state.queueState) {
       if (confirm('Biztosan nullázod a mai edzést?')) {
         state.reps = 0; state.sets = 0; state.total = 0; state.history = [];
         state.workoutCompleted = false;
+        state.queueState = null;
         stopRest(); stopAllRepFlows();
         if (window.speechSynthesis) speechSynthesis.cancel();
+        $('stat-sets').classList.remove('workout-done');
         render();
       }
     }
@@ -1358,7 +2146,7 @@ if ('serviceWorker' in navigator) {
   bindToggle('toggle-rest', 'rest', (on) => { if (!on) stopRest(); });
   bindToggle('toggle-countdown', 'countdown');
   bindToggle('toggle-auto-advance', 'autoAdvance', (on) => { if (!on) cancelAutoAdvance(); });
-  bindToggle('toggle-auto-rep', 'autoRep');
+  bindToggle('toggle-auto-rep', 'autoRep', (on) => syncSettingToActiveProfile('autoRep', on));
 
   function updateTargetDisplay() {
     $('target-value').textContent = state.settings.target === 0 ? 'ki' : state.settings.target;
@@ -1388,45 +2176,82 @@ if ('serviceWorker' in navigator) {
     $('rep-pause-dec').disabled = s <= 0;
     $('rep-pause-inc').disabled = s >= 20;
   }
+  // When the user tweaks a workout-shape setting and a profile is active,
+  // mirror the change back into the profile so queues and re-applies stay in sync.
+  // Only workout-shape fields are mirrored; device prefs (voice/vibrate/wake/...)
+  // remain global.
+  const PROFILE_MIRRORED_FIELDS = ['target', 'targetSets', 'restDuration', 'repDuration', 'repPause', 'autoRep'];
+  function syncSettingToActiveProfile(field, value) {
+    if (!state.activeProfileId) return;
+    if (PROFILE_MIRRORED_FIELDS.indexOf(field) === -1) return;
+    const profile = profiles.find(p => p.id === state.activeProfileId);
+    if (!profile) return;
+    if (profile[field] === value) return;
+    profile[field] = value;
+    saveProfiles();
+    // Refresh chips so any visible profile detail stays consistent
+    renderProfiles();
+  }
+
   $('target-dec').addEventListener('click', () => {
     state.settings.target = Math.max(0, state.settings.target - 1);
-    updateTargetDisplay(); render();
+    updateTargetDisplay();
+    syncSettingToActiveProfile('target', state.settings.target);
+    render();
   });
   $('target-inc').addEventListener('click', () => {
     state.settings.target = Math.min(100, state.settings.target + 1);
-    updateTargetDisplay(); render();
+    updateTargetDisplay();
+    syncSettingToActiveProfile('target', state.settings.target);
+    render();
   });
   $('target-sets-dec').addEventListener('click', () => {
     state.settings.targetSets = Math.max(0, state.settings.targetSets - 1);
-    updateTargetSetsDisplay(); render();
+    updateTargetSetsDisplay();
+    syncSettingToActiveProfile('targetSets', state.settings.targetSets);
+    render();
   });
   $('target-sets-inc').addEventListener('click', () => {
     state.settings.targetSets = Math.min(20, state.settings.targetSets + 1);
-    updateTargetSetsDisplay(); render();
+    updateTargetSetsDisplay();
+    syncSettingToActiveProfile('targetSets', state.settings.targetSets);
+    render();
   });
   $('rest-dec').addEventListener('click', () => {
     state.settings.restDuration = Math.max(0, state.settings.restDuration - 15);
-    updateRestDisplay(); saveState();
+    updateRestDisplay();
+    syncSettingToActiveProfile('restDuration', state.settings.restDuration);
+    saveState();
   });
   $('rest-inc').addEventListener('click', () => {
     state.settings.restDuration = Math.min(600, state.settings.restDuration + 15);
-    updateRestDisplay(); saveState();
+    updateRestDisplay();
+    syncSettingToActiveProfile('restDuration', state.settings.restDuration);
+    saveState();
   });
   $('rep-dur-dec').addEventListener('click', () => {
     state.settings.repDuration = Math.max(0, state.settings.repDuration - 1);
-    updateRepDurDisplay(); saveState();
+    updateRepDurDisplay();
+    syncSettingToActiveProfile('repDuration', state.settings.repDuration);
+    saveState();
   });
   $('rep-dur-inc').addEventListener('click', () => {
     state.settings.repDuration = Math.min(20, state.settings.repDuration + 1);
-    updateRepDurDisplay(); saveState();
+    updateRepDurDisplay();
+    syncSettingToActiveProfile('repDuration', state.settings.repDuration);
+    saveState();
   });
   $('rep-pause-dec').addEventListener('click', () => {
     state.settings.repPause = Math.max(0, state.settings.repPause - 1);
-    updateRepPauseDisplay(); saveState();
+    updateRepPauseDisplay();
+    syncSettingToActiveProfile('repPause', state.settings.repPause);
+    saveState();
   });
   $('rep-pause-inc').addEventListener('click', () => {
     state.settings.repPause = Math.min(20, state.settings.repPause + 1);
-    updateRepPauseDisplay(); saveState();
+    updateRepPauseDisplay();
+    syncSettingToActiveProfile('repPause', state.settings.repPause);
+    saveState();
   });
 
   updateTargetDisplay();
