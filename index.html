@@ -439,6 +439,30 @@
     text-align: right;
   }
   .modal-input[type="text"] { text-align: left; }
+  .seg {
+    display: flex;
+    background: var(--bg-soft);
+    border: 0.5px solid var(--border-strong);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .seg-btn {
+    flex: 1;
+    background: transparent;
+    border: 0;
+    color: var(--text-muted);
+    font-family: inherit;
+    font-size: 13px;
+    padding: 8px 6px;
+    cursor: pointer;
+    -webkit-appearance: none;
+    transition: background 0.12s, color 0.12s;
+  }
+  .seg-btn + .seg-btn { border-left: 0.5px solid var(--border); }
+  .seg-btn.on {
+    background: var(--accent);
+    color: #fff;
+  }
   .modal-actions {
     display: flex;
     gap: 8px;
@@ -769,7 +793,7 @@
       <input type="text" class="modal-input" id="edit-name" maxlength="24" placeholder="pl. Fekvenyomás">
     </div>
     <div class="modal-row">
-      <span>Cél / szett</span>
+      <span>Ismétlésszám</span>
       <input type="number" class="modal-input" id="edit-target" min="1" max="100" inputmode="numeric">
     </div>
     <div class="modal-row">
@@ -787,6 +811,14 @@
     <div class="modal-row">
       <span>Szünet ism. közt (mp)</span>
       <input type="number" class="modal-input" id="edit-rep-pause" min="0" max="20" inputmode="numeric">
+    </div>
+    <div class="modal-row">
+      <span>Sorozat típus</span>
+      <div class="seg" id="edit-progression" style="width:55%;">
+        <button type="button" class="seg-btn on" data-prog="none">Egyenletes</button>
+        <button type="button" class="seg-btn" data-prog="pyramid">Piramis ▲</button>
+        <button type="button" class="seg-btn" data-prog="reverse">Fordított piramis ▼</button>
+      </div>
     </div>
     <div class="modal-row">
       <span>Auto-ismétlés</span>
@@ -859,7 +891,7 @@ if ('serviceWorker' in navigator) {
     voice: true, vibrate: true, wake: true, rest: true, countdown: true,
     autoAdvance: true, autoRep: false,
     target: 10, targetSets: 0, restDuration: 90,
-    repDuration: 0, repPause: 0
+    repDuration: 0, repPause: 0, progression: 'none'
   };
 
   const DEFAULT_PROFILES = [
@@ -901,7 +933,7 @@ if ('serviceWorker' in navigator) {
 
   try {
     const sp = JSON.parse(localStorage.getItem(PROFILES_KEY) || 'null');
-    if (Array.isArray(sp)) profiles = sp.map(p => Object.assign({repDuration: 0, repPause: 0}, p));
+    if (Array.isArray(sp)) profiles = sp.map(p => Object.assign({repDuration: 0, repPause: 0, progression: 'none'}, p));
   } catch (e) {}
 
   try {
@@ -918,6 +950,32 @@ if ('serviceWorker' in navigator) {
   function saveProfiles() { try { localStorage.setItem(PROFILES_KEY, JSON.stringify(profiles)); } catch (e) {} }
   function saveWorkoutLog() { try { localStorage.setItem(LOG_KEY, JSON.stringify(workoutLog)); } catch (e) {} }
   function saveQueues() { try { localStorage.setItem(QUEUES_KEY, JSON.stringify(queues)); } catch (e) {} }
+
+  // Computes the rep target for a given set in a pyramid/reverse-pyramid progression.
+  // - base: the profile's base "Ismétlésszám" value (start of pyramid, end of reverse)
+  // - totalSets: configured number of sets (0 or 1 disables progression scaling)
+  // - setIndex: 0-based index of the set being prepared (0 = first set)
+  // - mode: 'none' | 'pyramid' | 'reverse'
+  // Endpoint defaults to ceil(base/2) so a 12-rep base scales 12→6 over the sets.
+  function computeSetReps(base, totalSets, setIndex, mode) {
+    if (!mode || mode === 'none' || !totalSets || totalSets <= 1) return base;
+    if (setIndex < 0) setIndex = 0;
+    if (setIndex >= totalSets) setIndex = totalSets - 1;
+    const endpoint = Math.max(1, Math.ceil(base / 2));
+    const step = (base - endpoint) / (totalSets - 1);
+    const reps = mode === 'pyramid'
+      ? base - step * setIndex
+      : endpoint + step * setIndex;
+    return Math.max(1, Math.round(reps));
+  }
+
+  // Returns the current set's target reps for a given profile, given how many sets are already done.
+  function profileTargetForSet(profile, setsDone) {
+    if (!profile) return 0;
+    const mode = profile.progression || 'none';
+    const totalSets = profile.targetSets || 0;
+    return computeSetReps(profile.target, totalSets, setsDone, mode);
+  }
 
   const $ = id => document.getElementById(id);
 
@@ -1328,7 +1386,7 @@ if ('serviceWorker' in navigator) {
     state.workoutCompleted = false;
     $('stat-sets').classList.remove('workout-done');
     // Apply next profile's settings
-    state.settings.target = profile.target;
+    state.settings.target = profileTargetForSet(profile, 0);
     state.settings.targetSets = profile.targetSets || 0;
     state.settings.restDuration = profile.restDuration;
     state.settings.repDuration = profile.repDuration || 0;
@@ -1473,7 +1531,7 @@ if ('serviceWorker' in navigator) {
   function applyProfile(p) {
     // Manual profile selection cancels any running queue
     if (state.queueState) state.queueState = null;
-    state.settings.target = p.target;
+    state.settings.target = profileTargetForSet(p, state.sets);
     state.settings.targetSets = p.targetSets || 0;
     state.settings.restDuration = p.restDuration;
     state.settings.repDuration = p.repDuration || 0;
@@ -1520,7 +1578,10 @@ if ('serviceWorker' in navigator) {
         tempoPart = ' · ' + p.repPause + ' mp sz.';
       }
       const autoPart = p.autoRep ? ' · auto' : '';
-      detail.textContent = setsPart + p.target + ' ism · ' + formatTime(p.restDuration) + ' pihenő' + tempoPart + autoPart;
+      let progPart = '';
+      if (p.progression === 'pyramid') progPart = ' · ▲ piramis';
+      else if (p.progression === 'reverse') progPart = ' · ▼ fordított piramis';
+      detail.textContent = setsPart + p.target + ' ism · ' + formatTime(p.restDuration) + ' pihenő' + tempoPart + autoPart + progPart;
       info.appendChild(name); info.appendChild(detail);
       const actions = document.createElement('div');
       actions.className = 'profile-actions';
@@ -1561,10 +1622,38 @@ if ('serviceWorker' in navigator) {
     $('edit-rep-pause').value = p ? (p.repPause || 0) : 0;
     const autoRepInitial = p && typeof p.autoRep === 'boolean' ? p.autoRep : false;
     $('edit-auto-rep').classList.toggle('on', !!autoRepInitial);
+    const progInitial = (p && p.progression) ? p.progression : 'none';
+    setEditProgression(progInitial);
+    closeEditModal_progressionLabelHint();
     closeProfilesModal();
     $('edit-modal').classList.add('open');
     setTimeout(() => $('edit-name').focus(), 50);
   }
+  function setEditProgression(mode) {
+    const seg = $('edit-progression');
+    if (!seg) return;
+    seg.querySelectorAll('.seg-btn').forEach(b => {
+      b.classList.toggle('on', b.getAttribute('data-prog') === mode);
+    });
+  }
+  function getEditProgression() {
+    const seg = $('edit-progression');
+    if (!seg) return 'none';
+    const on = seg.querySelector('.seg-btn.on');
+    return on ? on.getAttribute('data-prog') : 'none';
+  }
+  // Placeholder hook in case we later want a contextual hint near the progression row.
+  function closeEditModal_progressionLabelHint() { /* reserved */ }
+  // Wire up the segment buttons once.
+  (function bindProgressionSeg() {
+    const seg = $('edit-progression');
+    if (!seg) return;
+    seg.addEventListener('click', (e) => {
+      const btn = e.target.closest('.seg-btn');
+      if (!btn) return;
+      setEditProgression(btn.getAttribute('data-prog'));
+    });
+  })();
   function closeEditModal() { $('edit-modal').classList.remove('open'); editingProfile = null; }
   // The edit-modal toggle just flips a class; saveEdit reads it.
   $('edit-auto-rep').addEventListener('click', () => {
@@ -1578,12 +1667,17 @@ if ('serviceWorker' in navigator) {
     const repDuration = parseInt($('edit-rep-dur').value, 10);
     const repPause = parseInt($('edit-rep-pause').value, 10);
     const autoRep = $('edit-auto-rep').classList.contains('on');
+    const progression = getEditProgression();
     if (!name) { alert('Adj meg egy nevet.'); return; }
-    if (!(target >= 1 && target <= 100)) { alert('Cél / szett: 1 és 100 között.'); return; }
+    if (!(target >= 1 && target <= 100)) { alert('Ismétlésszám: 1 és 100 között.'); return; }
     if (!(targetSets >= 0 && targetSets <= 20)) { alert('Szettszám: 0 és 20 között.'); return; }
     if (!(restDuration >= 0 && restDuration <= 600)) { alert('Pihenő: 0 és 600 mp között.'); return; }
     if (!(repDuration >= 0 && repDuration <= 20)) { alert('Idő / ismétlés: 0 és 20 mp között.'); return; }
     if (!(repPause >= 0 && repPause <= 20)) { alert('Szünet ism. közt: 0 és 20 mp között.'); return; }
+    if (progression !== 'none' && targetSets < 2) {
+      alert('Piramis / fordított piramis sorozathoz legalább 2 szettet adj meg.');
+      return;
+    }
     if (editingProfile) {
       editingProfile.name = name;
       editingProfile.target = target;
@@ -1592,9 +1686,11 @@ if ('serviceWorker' in navigator) {
       editingProfile.repDuration = repDuration;
       editingProfile.repPause = repPause;
       editingProfile.autoRep = autoRep;
+      editingProfile.progression = progression;
       // If this profile is currently active, propagate live changes
       if (state.activeProfileId === editingProfile.id) {
-        state.settings.target = target;
+        // Re-derive the current set's target from the (possibly new) base + progression mode
+        state.settings.target = profileTargetForSet(editingProfile, state.sets);
         state.settings.targetSets = targetSets;
         state.settings.restDuration = restDuration;
         state.settings.repDuration = repDuration;
@@ -1608,7 +1704,7 @@ if ('serviceWorker' in navigator) {
         updateRepPauseDisplay();
       }
     } else {
-      profiles.push({ id: 'p' + Date.now(), name, target, targetSets, restDuration, repDuration, repPause, autoRep });
+      profiles.push({ id: 'p' + Date.now(), name, target, targetSets, restDuration, repDuration, repPause, autoRep, progression });
     }
     saveProfiles();
     closeEditModal();
@@ -1752,7 +1848,7 @@ if ('serviceWorker' in navigator) {
       steps: queue.steps.slice(),
       index: 0
     };
-    state.settings.target = first.target;
+    state.settings.target = profileTargetForSet(first, 0);
     state.settings.targetSets = first.targetSets || 0;
     state.settings.restDuration = first.restDuration;
     state.settings.repDuration = first.repDuration || 0;
@@ -2089,6 +2185,14 @@ if ('serviceWorker' in navigator) {
       render();
       setTimeout(triggerWorkoutComplete, 200);
     } else {
+      // If the active profile uses pyramid/reverse progression, recompute the next set's target.
+      if (state.activeProfileId) {
+        const ap = profiles.find(p => p.id === state.activeProfileId);
+        if (ap && ap.progression && ap.progression !== 'none') {
+          state.settings.target = profileTargetForSet(ap, state.sets);
+          updateTargetDisplay();
+        }
+      }
       render();
       startRest();
     }
@@ -2186,6 +2290,10 @@ if ('serviceWorker' in navigator) {
     if (PROFILE_MIRRORED_FIELDS.indexOf(field) === -1) return;
     const profile = profiles.find(p => p.id === state.activeProfileId);
     if (!profile) return;
+    // If the profile uses pyramid/reverse progression, do NOT mirror manual target tweaks
+    // back to the profile — the profile's `target` is the *base* value used to compute
+    // each set's reps. Manual +/- on the main screen only affects the current set.
+    if (field === 'target' && profile.progression && profile.progression !== 'none') return;
     if (profile[field] === value) return;
     profile[field] = value;
     saveProfiles();
