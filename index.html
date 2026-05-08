@@ -2144,6 +2144,27 @@ if ('serviceWorker' in navigator) {
     doIncrement(true);
   }
 
+  function canAutoStartSet() {
+    // After a rest-finished set change, start the next set's first rep automatically
+    // when auto-rep is enabled or any per-rep timing is configured.
+    return !!(state.settings.autoRep || state.settings.repDuration > 0 || state.settings.repPause > 0);
+  }
+
+  function autoStartSetAfterRest() {
+    if (!canAutoStartSet()) return;
+    setTimeout(() => {
+      if (state.workoutCompleted) return;
+      if (state.reps !== 0) return;
+      if (restEndTime || restInterval || repTimerInterval || repPauseInterval) return;
+      autoAdvanceRep();
+    }, 350);
+  }
+
+  function advanceSetAfterRest() {
+    doNewSet(true, true);
+    autoStartSetAfterRest();
+  }
+
   function doIncrement(fromAuto) {
     ensureToday();
     // User tap cancels any running flow; auto-advance rep also calls this but flows were already stopped before.
@@ -2176,7 +2197,7 @@ if ('serviceWorker' in navigator) {
         const completesWorkout = ts > 0 && (state.sets + 1) >= ts;
         const canWaitForRest = !completesWorkout && state.settings.rest && state.settings.restDuration > 0;
         if (restAutoAdv && canWaitForRest) {
-          startRest(() => doNewSet(true, true));
+          startRest(advanceSetAfterRest);
         } else if (autoAdv || restAutoAdv) {
           scheduleAutoAdvance(1500);
         }
