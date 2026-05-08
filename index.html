@@ -725,6 +725,10 @@
       <span>3-2-1 előjelzés a végén</span>
       <div class="toggle" id="toggle-countdown" role="switch"></div>
     </div>
+    <div class="setting-row">
+      <span>Pihenő végén automatikus szettváltás</span>
+      <div class="toggle" id="toggle-rest-auto-advance" role="switch"></div>
+    </div>
 
     <div class="section-label">Jelzések</div>
     <div class="setting-row">
@@ -889,7 +893,7 @@ if ('serviceWorker' in navigator) {
 
   const DEFAULTS = {
     voice: true, vibrate: true, wake: true, rest: true, countdown: true,
-    autoAdvance: true, autoRep: false,
+    autoAdvance: true, restAutoAdvance: false, autoRep: false,
     target: 10, targetSets: 0, restDuration: 90,
     repDuration: 0, repPause: 0, progression: 'none'
   };
@@ -1145,10 +1149,24 @@ if ('serviceWorker' in navigator) {
   let restInterval = null;
   let restSignaled = false;
   let lastWarningSec = null;
+  let restOnComplete = null;
+  let restCompletionTimeout = null;
 
-  function startRest() {
+  function isRestAutoAdvancePending() {
+    return !!(restOnComplete || restCompletionTimeout);
+  }
+  function cancelRestCompletionAction() {
+    restOnComplete = null;
+    if (restCompletionTimeout) {
+      clearTimeout(restCompletionTimeout);
+      restCompletionTimeout = null;
+    }
+  }
+
+  function startRest(onComplete) {
     stopRest();
     if (!state.settings.rest || state.settings.restDuration <= 0) return;
+    restOnComplete = typeof onComplete === 'function' ? onComplete : null;
     restEndTime = Date.now() + state.settings.restDuration * 1000;
     restSignaled = false;
     lastWarningSec = null;
@@ -1162,6 +1180,7 @@ if ('serviceWorker' in navigator) {
     restEndTime = null;
     restSignaled = false;
     lastWarningSec = null;
+    cancelRestCompletionAction();
     const rd = $('rest-display');
     rd.textContent = '';
     rd.classList.remove('done', 'warning');
@@ -1193,6 +1212,14 @@ if ('serviceWorker' in navigator) {
         buzz([150, 80, 150, 80, 300]);
         beep(1100, 400);
         setTimeout(() => speak('Indulhat'), 450);
+        if (restOnComplete) {
+          const cb = restOnComplete;
+          restOnComplete = null;
+          restCompletionTimeout = setTimeout(() => {
+            restCompletionTimeout = null;
+            cb();
+          }, 1200);
+        }
       }
     }
   }
@@ -2138,13 +2165,21 @@ if ('serviceWorker' in navigator) {
     const hasPause = state.settings.repPause > 0;
     const autoRep = state.settings.autoRep;
     const autoAdv = state.settings.autoAdvance;
+    const restAutoAdv = state.settings.restAutoAdvance;
     const belowTarget = (target <= 0 || state.reps < target);
 
     // After the rep's tempo (or immediately if no tempo) this fires.
     const onRepDone = () => {
       if (isTargetHit) {
         triggerSetCompleteSignal();
-        if (autoAdv) scheduleAutoAdvance(1500);
+        const ts = state.settings.targetSets;
+        const completesWorkout = ts > 0 && (state.sets + 1) >= ts;
+        const canWaitForRest = !completesWorkout && state.settings.rest && state.settings.restDuration > 0;
+        if (restAutoAdv && canWaitForRest) {
+          startRest(() => doNewSet(true, true));
+        } else if (autoAdv || restAutoAdv) {
+          scheduleAutoAdvance(1500);
+        }
         return;
       }
       if (hasPause && belowTarget) {
@@ -2172,9 +2207,10 @@ if ('serviceWorker' in navigator) {
 
   function increment() { doIncrement(false); }
 
-  function doNewSet(fromAuto) {
+  function doNewSet(fromAuto, skipRest) {
     if (state.reps <= 0) return;
     stopAllRepFlows();
+    stopRest();
     state.history.push(state.reps);
     state.sets++;
     state.reps = 0;
@@ -2194,7 +2230,7 @@ if ('serviceWorker' in navigator) {
         }
       }
       render();
-      startRest();
+      if (!skipRest) startRest();
     }
   }
 
@@ -2206,12 +2242,13 @@ if ('serviceWorker' in navigator) {
   $('minus').addEventListener('click', () => {
     if (state.reps > 0) {
       stopAllRepFlows();
+      if (isRestAutoAdvancePending()) stopRest();
       state.reps--; state.total--;
       render();
     }
   });
 
-  $('new-set').addEventListener('click', () => { doNewSet(false); });
+  $('new-set').addEventListener('click', () => { doNewSet(false, isRestAutoAdvancePending()); });
 
   $('reset').addEventListener('click', () => {
     if (state.reps || state.sets || state.total || state.queueState) {
@@ -2249,6 +2286,7 @@ if ('serviceWorker' in navigator) {
   });
   bindToggle('toggle-rest', 'rest', (on) => { if (!on) stopRest(); });
   bindToggle('toggle-countdown', 'countdown');
+  bindToggle('toggle-rest-auto-advance', 'restAutoAdvance', (on) => { if (!on) cancelRestCompletionAction(); });
   bindToggle('toggle-auto-advance', 'autoAdvance', (on) => { if (!on) cancelAutoAdvance(); });
   bindToggle('toggle-auto-rep', 'autoRep', (on) => syncSettingToActiveProfile('autoRep', on));
 
