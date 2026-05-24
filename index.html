@@ -188,7 +188,7 @@
   .chip-add:active { background: var(--bg-soft); }
   .stats {
     display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-columns: repeat(4, 1fr);
     gap: 8px;
   }
   .stat {
@@ -197,6 +197,7 @@
     padding: 10px 12px;
   }
   .stat.workout-done { background: var(--success-bg); }
+  .stat.timer-limit-hit { background: var(--success-bg); }
   .stat-label {
     font-size: 11px;
     color: var(--text-muted);
@@ -210,6 +211,7 @@
     font-variant-numeric: tabular-nums;
   }
   .stat.workout-done .stat-value { color: var(--success); }
+  .stat.timer-limit-hit .stat-value { color: var(--success); }
   .counter {
     flex: 1;
     background: var(--bg-soft);
@@ -730,6 +732,16 @@
       <div class="toggle" id="toggle-rest-auto-advance" role="switch"></div>
     </div>
 
+    <div class="section-label">Összidő</div>
+    <div class="setting-row">
+      <span>Összidő figyelés <span style="color:var(--text-faint);font-size:12px;">(0 = nincs jelzés)</span></span>
+      <div class="stepper">
+        <button class="step-btn" id="workout-limit-dec">−</button>
+        <span class="step-value" id="workout-limit-value">ki</span>
+        <button class="step-btn" id="workout-limit-inc">+</button>
+      </div>
+    </div>
+
     <div class="section-label">Jelzések</div>
     <div class="setting-row">
       <span>Hangos számolás</span>
@@ -757,6 +769,10 @@
     <div class="stat">
       <div class="stat-label">Összes</div>
       <div class="stat-value" id="total">0</div>
+    </div>
+    <div class="stat" id="stat-workout-timer">
+      <div class="stat-label">Idő</div>
+      <div class="stat-value" id="workout-timer">0:00</div>
     </div>
   </div>
 
@@ -895,7 +911,8 @@ if ('serviceWorker' in navigator) {
     voice: true, vibrate: true, wake: true, rest: true, countdown: true,
     autoAdvance: true, restAutoAdvance: false, autoRep: false,
     target: 10, targetSets: 0, restDuration: 90,
-    repDuration: 0, repPause: 0, progression: 'none'
+    repDuration: 0, repPause: 0, progression: 'none',
+    workoutTimeLimitMinutes: 0
   };
 
   const DEFAULT_PROFILES = [
@@ -912,6 +929,9 @@ if ('serviceWorker' in navigator) {
     activeProfileId: null,
     workoutCompleted: false,
     queueState: null,
+    workoutTimerStart: null,
+    workoutTimerElapsed: 0,
+    workoutTimerLimitHit: false,
     settings: Object.assign({}, DEFAULTS)
   };
 
@@ -931,6 +951,9 @@ if ('serviceWorker' in navigator) {
         state.activeProfileId = saved.activeProfileId || null;
         state.workoutCompleted = !!saved.workoutCompleted;
         state.queueState = saved.queueState || null;
+        state.workoutTimerStart = saved.workoutTimerStart || null;
+        state.workoutTimerElapsed = saved.workoutTimerElapsed || 0;
+        state.workoutTimerLimitHit = !!saved.workoutTimerLimitHit;
       }
     }
   } catch (e) {}
@@ -1189,6 +1212,93 @@ if ('serviceWorker' in navigator) {
     const m = Math.floor(s / 60);
     const sec = s % 60;
     return m + ':' + String(sec).padStart(2, '0');
+  }
+
+  // --- Workout total stopwatch ---
+  let workoutTimerInterval = null;
+
+  function getWorkoutTimerElapsed() {
+    if (state.workoutTimerStart && !state.workoutTimerLimitHit) {
+      return Math.max(0, Math.floor((Date.now() - state.workoutTimerStart) / 1000));
+    }
+    return Math.max(0, state.workoutTimerElapsed || 0);
+  }
+
+  function isWorkoutTimerRunning() {
+    return !!(state.workoutTimerStart && !state.workoutTimerLimitHit);
+  }
+
+  function startWorkoutTimerTicking() {
+    if (workoutTimerInterval) return;
+    workoutTimerInterval = setInterval(updateWorkoutTimer, 1000);
+  }
+
+  function stopWorkoutTimerTicking() {
+    if (workoutTimerInterval) clearInterval(workoutTimerInterval);
+    workoutTimerInterval = null;
+  }
+
+  function startWorkoutTimer(forceRestart) {
+    if (forceRestart) resetWorkoutTimer(false);
+    if (state.workoutTimerLimitHit) return;
+    if (!state.workoutTimerStart) {
+      state.workoutTimerStart = Date.now() - (state.workoutTimerElapsed || 0) * 1000;
+      state.workoutTimerLimitHit = false;
+      saveState();
+    }
+    startWorkoutTimerTicking();
+    updateWorkoutTimer();
+  }
+
+  function resetWorkoutTimer(shouldRender) {
+    stopWorkoutTimerTicking();
+    state.workoutTimerStart = null;
+    state.workoutTimerElapsed = 0;
+    state.workoutTimerLimitHit = false;
+    const stat = $('stat-workout-timer');
+    if (stat) stat.classList.remove('timer-limit-hit');
+    const el = $('workout-timer');
+    if (el) el.textContent = '0:00';
+    if (shouldRender !== false) render();
+  }
+
+  function triggerWorkoutTimerLimitSignal(limitSeconds) {
+    buzz([200, 80, 200, 80, 400]);
+    setTimeout(() => beep(700, 140), 0);
+    setTimeout(() => beep(950, 140), 180);
+    setTimeout(() => beep(1250, 350), 360);
+    setTimeout(() => speak('Elérted az összidőt', 1.0), 750);
+  }
+
+  function completeWorkoutTimerLimit(limitSeconds) {
+    state.workoutTimerElapsed = limitSeconds;
+    state.workoutTimerStart = null;
+    state.workoutTimerLimitHit = true;
+    stopWorkoutTimerTicking();
+    updateWorkoutTimerDisplay(limitSeconds);
+    saveState();
+    triggerWorkoutTimerLimitSignal(limitSeconds);
+  }
+
+  function updateWorkoutTimerDisplay(elapsed) {
+    const el = $('workout-timer');
+    const stat = $('stat-workout-timer');
+    if (!el || !stat) return;
+    el.textContent = formatTime(elapsed);
+    stat.classList.toggle('timer-limit-hit', !!state.workoutTimerLimitHit);
+  }
+
+  function updateWorkoutTimer() {
+    const elapsed = getWorkoutTimerElapsed();
+    const limitMinutes = state.settings.workoutTimeLimitMinutes || 0;
+    const limitSeconds = limitMinutes > 0 ? limitMinutes * 60 : 0;
+    if (!state.workoutTimerLimitHit && limitSeconds > 0 && elapsed >= limitSeconds) {
+      completeWorkoutTimerLimit(limitSeconds);
+      return;
+    }
+    state.workoutTimerElapsed = elapsed;
+    updateWorkoutTimerDisplay(elapsed);
+    saveState();
   }
   function updateRest() {
     if (!restEndTime) return;
@@ -1523,6 +1633,7 @@ if ('serviceWorker' in navigator) {
     else statSets.classList.remove('workout-done');
     renderProfiles();
     renderQueueBanner();
+    updateWorkoutTimer();
     saveState();
   }
 
@@ -1891,6 +2002,7 @@ if ('serviceWorker' in navigator) {
     updateRepDurDisplay();
     updateRepPauseDisplay();
     closeQueueModal();
+    startWorkoutTimer(true);
     render();
     // Spoken cue so the user knows the first exercise
     setTimeout(() => speak('Indul: ' + first.name, 1.0), 200);
@@ -2128,6 +2240,7 @@ if ('serviceWorker' in navigator) {
       state.reps = 0; state.sets = 0; state.total = 0; state.history = [];
       state.workoutCompleted = false;
       state.queueState = null;
+      resetWorkoutTimer(false);
       stopRest(); stopRepTimer(); stopRepPause(); cancelAutoAdvance();
     }
   }
@@ -2169,6 +2282,10 @@ if ('serviceWorker' in navigator) {
     ensureToday();
     // User tap cancels any running flow; auto-advance rep also calls this but flows were already stopped before.
     stopAllRepFlows();
+
+    if (!isWorkoutTimerRunning() && !state.workoutTimerLimitHit && getWorkoutTimerElapsed() === 0) {
+      startWorkoutTimer(false);
+    }
 
     const prev = state.reps;
     state.reps++;
@@ -2272,11 +2389,12 @@ if ('serviceWorker' in navigator) {
   $('new-set').addEventListener('click', () => { doNewSet(false, isRestAutoAdvancePending()); });
 
   $('reset').addEventListener('click', () => {
-    if (state.reps || state.sets || state.total || state.queueState) {
+    if (state.reps || state.sets || state.total || state.queueState || getWorkoutTimerElapsed() > 0 || state.workoutTimerLimitHit) {
       if (confirm('Biztosan nullázod a mai edzést?')) {
         state.reps = 0; state.sets = 0; state.total = 0; state.history = [];
         state.workoutCompleted = false;
         state.queueState = null;
+        resetWorkoutTimer(false);
         stopRest(); stopAllRepFlows();
         if (window.speechSynthesis) speechSynthesis.cancel();
         $('stat-sets').classList.remove('workout-done');
@@ -2326,6 +2444,12 @@ if ('serviceWorker' in navigator) {
     $('rest-value').textContent = s === 0 ? 'ki' : (s < 60 ? s + ' mp' : formatTime(s));
     $('rest-dec').disabled = s <= 0;
     $('rest-inc').disabled = s >= 600;
+  }
+  function updateWorkoutLimitDisplay() {
+    const m = state.settings.workoutTimeLimitMinutes || 0;
+    $('workout-limit-value').textContent = m === 0 ? 'ki' : m + ' perc';
+    $('workout-limit-dec').disabled = m <= 0;
+    $('workout-limit-inc').disabled = m >= 240;
   }
   function updateRepDurDisplay() {
     const s = state.settings.repDuration;
@@ -2396,6 +2520,18 @@ if ('serviceWorker' in navigator) {
     syncSettingToActiveProfile('restDuration', state.settings.restDuration);
     saveState();
   });
+  $('workout-limit-dec').addEventListener('click', () => {
+    state.settings.workoutTimeLimitMinutes = Math.max(0, (state.settings.workoutTimeLimitMinutes || 0) - 1);
+    updateWorkoutLimitDisplay();
+    updateWorkoutTimer();
+    saveState();
+  });
+  $('workout-limit-inc').addEventListener('click', () => {
+    state.settings.workoutTimeLimitMinutes = Math.min(240, (state.settings.workoutTimeLimitMinutes || 0) + 1);
+    updateWorkoutLimitDisplay();
+    updateWorkoutTimer();
+    saveState();
+  });
   $('rep-dur-dec').addEventListener('click', () => {
     state.settings.repDuration = Math.max(0, state.settings.repDuration - 1);
     updateRepDurDisplay();
@@ -2424,8 +2560,10 @@ if ('serviceWorker' in navigator) {
   updateTargetDisplay();
   updateTargetSetsDisplay();
   updateRestDisplay();
+  updateWorkoutLimitDisplay();
   updateRepDurDisplay();
   updateRepPauseDisplay();
+  if (isWorkoutTimerRunning()) startWorkoutTimerTicking();
   render();
   if (state.settings.wake) enableKeepAwake();
 })();
