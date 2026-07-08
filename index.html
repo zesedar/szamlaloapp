@@ -886,6 +886,10 @@
       <select class="queue-add-select" id="queue-add-select"></select>
       <button class="btn btn-small btn-primary" id="queue-add-btn">+ Hozzáad</button>
     </div>
+    <div class="setting-row" style="margin-top: 12px;">
+      <span>Automatikus indítás pihenő után <span style="color:var(--text-faint);font-size:12px;">(a következő feladat magától indul)</span></span>
+      <div class="toggle" id="queue-edit-auto-start" role="switch"></div>
+    </div>
     <div class="modal-actions">
       <button class="btn btn-small" id="queue-edit-cancel">Mégse</button>
       <button class="btn btn-primary btn-small" id="queue-edit-save">Mentés</button>
@@ -1539,8 +1543,27 @@ if ('serviceWorker' in navigator) {
     updateRepDurDisplay();
     updateRepPauseDisplay();
     // Start the rest timer between exercises so the user has time to set up
-    startRest();
+    if (state.queueState.autoStart) {
+      startRest(autoStartQueueExercise);
+      if (!restEndTime) {
+        // Rest is disabled or 0 — start the exercise after a short grace period
+        restCompletionTimeout = setTimeout(() => {
+          restCompletionTimeout = null;
+          autoStartQueueExercise();
+        }, 2000);
+      }
+    } else {
+      startRest();
+    }
     render();
+  }
+
+  function autoStartQueueExercise() {
+    if (!state.queueState) return;
+    if (state.workoutCompleted) return;
+    if (state.reps !== 0) return;
+    if (repTimerInterval || repPauseInterval) return;
+    autoAdvanceRep();
   }
 
   function triggerWorkoutComplete() {
@@ -1984,7 +2007,8 @@ if ('serviceWorker' in navigator) {
       queueId: queue.id,
       name: queue.name,
       steps: queue.steps.slice(),
-      index: 0
+      index: 0,
+      autoStart: !!queue.autoStart
     };
     state.settings.target = profileTargetForSet(first, 0);
     state.settings.targetSets = first.targetSets || 0;
@@ -2034,6 +2058,7 @@ if ('serviceWorker' in navigator) {
         return p ? p.name : '— törölt —';
       });
       detail.textContent = (q.steps || []).length + ' lépés' +
+        (q.autoStart ? ' · auto indítás' : '') +
         (stepNames.length ? ' · ' + stepNames.join(' → ') : '');
       info.appendChild(name);
       info.appendChild(detail);
@@ -2178,6 +2203,7 @@ if ('serviceWorker' in navigator) {
     editingSteps = q ? (q.steps || []).slice() : [];
     $('queue-edit-title').textContent = q ? 'Feladatsor szerkesztése' : 'Új feladatsor';
     $('queue-edit-name').value = q ? q.name : '';
+    $('queue-edit-auto-start').classList.toggle('on', !!(q && q.autoStart));
     populateQueueProfileSelect();
     renderQueueStepsList();
     closeQueueModal();
@@ -2198,18 +2224,22 @@ if ('serviceWorker' in navigator) {
       alert('Legalább egy lépést adj hozzá.');
       return;
     }
+    const autoStart = $('queue-edit-auto-start').classList.contains('on');
     if (editingQueue) {
       editingQueue.name = name;
       editingQueue.steps = editingSteps.slice();
+      editingQueue.autoStart = autoStart;
       // Sync the running queue if it's this one
       if (state.queueState && state.queueState.queueId === editingQueue.id) {
         state.queueState.name = name;
+        state.queueState.autoStart = autoStart;
       }
     } else {
       queues.push({
         id: 'q' + Date.now(),
         name,
-        steps: editingSteps.slice()
+        steps: editingSteps.slice(),
+        autoStart
       });
     }
     saveQueues();
@@ -2227,6 +2257,9 @@ if ('serviceWorker' in navigator) {
     if (!pid) return;
     editingSteps.push(pid);
     renderQueueStepsList();
+  });
+  $('queue-edit-auto-start').addEventListener('click', () => {
+    $('queue-edit-auto-start').classList.toggle('on');
   });
   $('queue-edit-modal').addEventListener('click', (e) => {
     if (e.target === $('queue-edit-modal')) closeQueueEditModal();
