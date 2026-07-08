@@ -909,7 +909,12 @@ if ('serviceWorker' in navigator) {
   const PROFILES_KEY = 'ismetles-profilok-v3';
   const LOG_KEY = 'ismetles-naplo-v1';
   const QUEUES_KEY = 'ismetles-feladatsorok-v1';
-  const todayStr = () => new Date().toISOString().slice(0, 10);
+  // Local calendar date (the old toISOString version was UTC-based, so the
+  // "day" flipped at 01:00/02:00 local time in Hungary instead of midnight).
+  const todayStr = () => {
+    const d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  };
 
   const DEFAULTS = {
     voice: true, vibrate: true, wake: true, rest: true, countdown: true,
@@ -936,6 +941,7 @@ if ('serviceWorker' in navigator) {
     workoutTimerStart: null,
     workoutTimerElapsed: 0,
     workoutTimerLimitHit: false,
+    restResume: null,
     settings: Object.assign({}, DEFAULTS)
   };
 
@@ -958,6 +964,7 @@ if ('serviceWorker' in navigator) {
         state.workoutTimerStart = saved.workoutTimerStart || null;
         state.workoutTimerElapsed = saved.workoutTimerElapsed || 0;
         state.workoutTimerLimitHit = !!saved.workoutTimerLimitHit;
+        state.restResume = saved.restResume || null;
       }
     }
   } catch (e) {}
@@ -1195,6 +1202,15 @@ if ('serviceWorker' in navigator) {
     if (!state.settings.rest || state.settings.restDuration <= 0) return;
     restOnComplete = typeof onComplete === 'function' ? onComplete : null;
     restEndTime = Date.now() + state.settings.restDuration * 1000;
+    // Persist the absolute end time (plus which auto action is pending)
+    // so a reload / OS-killed PWA can resume the countdown.
+    state.restResume = {
+      endTime: restEndTime,
+      action: restOnComplete === advanceSetAfterRest ? 'set'
+            : restOnComplete === autoStartQueueExercise ? 'queue'
+            : null
+    };
+    saveState();
     restSignaled = false;
     lastWarningSec = null;
     restInterval = setInterval(updateRest, 200);
@@ -1207,6 +1223,7 @@ if ('serviceWorker' in navigator) {
     restEndTime = null;
     restSignaled = false;
     lastWarningSec = null;
+    state.restResume = null;
     cancelRestCompletionAction();
     const rd = $('rest-display');
     rd.textContent = '';
@@ -1323,6 +1340,8 @@ if ('serviceWorker' in navigator) {
       rd.classList.add('done');
       if (!restSignaled) {
         restSignaled = true;
+        state.restResume = null;
+        saveState();
         buzz([150, 80, 150, 80, 300]);
         beep(1100, 400);
         setTimeout(() => speak('Indulhat'), 450);
@@ -1489,7 +1508,18 @@ if ('serviceWorker' in navigator) {
     saveWorkoutLog();
   }
 
+  // Cancellable timers for the workout/exercise completion windows.
+  // Without these, a delayed advanceQueue/autoReset could wipe or corrupt
+  // a NEW workout the user started during the 4.5s / 6s window.
+  let queueAdvanceTimeout = null;
+  let workoutResetTimeout = null;
+  function cancelCompletionTimers() {
+    if (queueAdvanceTimeout) { clearTimeout(queueAdvanceTimeout); queueAdvanceTimeout = null; }
+    if (workoutResetTimeout) { clearTimeout(workoutResetTimeout); workoutResetTimeout = null; }
+  }
+
   function autoResetAfterWorkout() {
+    cancelCompletionTimers();
     state.reps = 0;
     state.sets = 0;
     state.total = 0;
@@ -1505,6 +1535,7 @@ if ('serviceWorker' in navigator) {
 
   function advanceQueue() {
     if (!state.queueState) return;
+    cancelCompletionTimers();
     state.queueState.index++;
     if (state.queueState.index >= state.queueState.steps.length) {
       // Should not happen if triggerWorkoutComplete handles last step,
@@ -1583,7 +1614,9 @@ if ('serviceWorker' in navigator) {
       setTimeout(() => beep(880, 200), 170);
       setTimeout(() => speak('Gyakorlat kész. Jöhet: ' + nextName, 1.0), 500);
       $('stat-sets').classList.add('workout-done');
-      setTimeout(() => {
+      cancelCompletionTimers();
+      queueAdvanceTimeout = setTimeout(() => {
+        queueAdvanceTimeout = null;
         $('stat-sets').classList.remove('workout-done');
         advanceQueue();
       }, 4500);
@@ -1596,7 +1629,11 @@ if ('serviceWorker' in navigator) {
       setTimeout(() => speak('edzés kész', 1.0), 800);
       $('stat-sets').classList.add('workout-done');
       // Auto reset so the next workout starts fresh
-      setTimeout(autoResetAfterWorkout, 6000);
+      cancelCompletionTimers();
+      workoutResetTimeout = setTimeout(() => {
+        workoutResetTimeout = null;
+        autoResetAfterWorkout();
+      }, 6000);
     }
   }
 
@@ -1630,8 +1667,15 @@ if ('serviceWorker' in navigator) {
     stop.textContent = 'Megáll';
     stop.addEventListener('click', () => {
       if (confirm('Megszakítod a feladatsort?')) {
-        state.queueState = null;
-        render();
+        if (state.workoutCompleted) {
+          // We're inside the completion window — finish the pending reset now
+          // instead of leaving an orphaned timer behind.
+          autoResetAfterWorkout();
+        } else {
+          cancelCompletionTimers();
+          state.queueState = null;
+          render();
+        }
       }
     });
     banner.appendChild(info);
@@ -1690,6 +1734,9 @@ if ('serviceWorker' in navigator) {
   }
 
   function applyProfile(p) {
+    // If we're inside a completion window, resolve it now so its pending
+    // timers can't wipe the state the user is about to build.
+    if (state.workoutCompleted) autoResetAfterWorkout();
     // Manual profile selection cancels any running queue
     if (state.queueState) state.queueState = null;
     state.settings.target = profileTargetForSet(p, state.sets);
@@ -1994,6 +2041,7 @@ if ('serviceWorker' in navigator) {
       if (!confirm('Egy edzés van folyamatban. Új feladatsor indítása nullázza azt. Folytatod?')) return;
     }
     // Reset counter, then apply first profile
+    cancelCompletionTimers();
     state.reps = 0;
     state.sets = 0;
     state.total = 0;
@@ -2269,7 +2317,11 @@ if ('serviceWorker' in navigator) {
   function ensureToday() {
     const t = todayStr();
     if (state.date !== t) {
+      // If a workout is in progress (e.g. training across midnight), don't
+      // wipe it silently — just roll the date forward and keep counting.
+      const inProgress = state.reps > 0 || state.sets > 0 || !!state.queueState || isWorkoutTimerRunning();
       state.date = t;
+      if (inProgress) { saveState(); return; }
       state.reps = 0; state.sets = 0; state.total = 0; state.history = [];
       state.workoutCompleted = false;
       state.queueState = null;
@@ -2312,6 +2364,9 @@ if ('serviceWorker' in navigator) {
   }
 
   function doIncrement(fromAuto) {
+    // Ignore taps during the "gyakorlat kész" / "edzés kész" window —
+    // anything counted here would be wiped by the pending advance/reset.
+    if (state.workoutCompleted) return;
     ensureToday();
     // User tap cancels any running flow; auto-advance rep also calls this but flows were already stopped before.
     stopAllRepFlows();
@@ -2424,6 +2479,7 @@ if ('serviceWorker' in navigator) {
   $('reset').addEventListener('click', () => {
     if (state.reps || state.sets || state.total || state.queueState || getWorkoutTimerElapsed() > 0 || state.workoutTimerLimitHit) {
       if (confirm('Biztosan nullázod a mai edzést?')) {
+        cancelCompletionTimers();
         state.reps = 0; state.sets = 0; state.total = 0; state.history = [];
         state.workoutCompleted = false;
         state.queueState = null;
@@ -2597,6 +2653,22 @@ if ('serviceWorker' in navigator) {
   updateRepDurDisplay();
   updateRepPauseDisplay();
   if (isWorkoutTimerRunning()) startWorkoutTimerTicking();
+  // Resume an in-progress rest countdown after a reload / PWA restart.
+  // If it expired while the app was closed, just drop it — firing a
+  // possibly hours-old auto action would be worse than doing nothing.
+  if (state.restResume && state.restResume.endTime > Date.now()) {
+    restEndTime = state.restResume.endTime;
+    restOnComplete = state.restResume.action === 'set' ? advanceSetAfterRest
+                   : state.restResume.action === 'queue' ? autoStartQueueExercise
+                   : null;
+    restSignaled = false;
+    lastWarningSec = null;
+    restInterval = setInterval(updateRest, 200);
+    updateRest();
+    if (state.settings.wake) enableKeepAwake();
+  } else {
+    state.restResume = null;
+  }
   render();
   if (state.settings.wake) enableKeepAwake();
 })();
