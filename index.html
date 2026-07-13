@@ -1179,12 +1179,14 @@ if ('serviceWorker' in navigator) {
   });
 
   // --- Rest timer ---
+  const QUEUE_PREP_SECONDS = 30; // Feladatsor indításakor a felkészülési idő
   let restEndTime = null;
   let restInterval = null;
   let restSignaled = false;
   let lastWarningSec = null;
   let restOnComplete = null;
   let restCompletionTimeout = null;
+  let restLabel = 'Pihenő';
 
   function isRestAutoAdvancePending() {
     return !!(restOnComplete || restCompletionTimeout);
@@ -1197,17 +1199,21 @@ if ('serviceWorker' in navigator) {
     }
   }
 
-  function startRest(onComplete) {
+  function startRest(onComplete, durationOverride, label) {
     stopRest();
-    if (!state.settings.rest || state.settings.restDuration <= 0) return;
+    const hasOverride = typeof durationOverride === 'number' && durationOverride > 0;
+    if (!hasOverride && (!state.settings.rest || state.settings.restDuration <= 0)) return;
+    const duration = hasOverride ? durationOverride : state.settings.restDuration;
+    restLabel = label || 'Pihenő';
     restOnComplete = typeof onComplete === 'function' ? onComplete : null;
-    restEndTime = Date.now() + state.settings.restDuration * 1000;
+    restEndTime = Date.now() + duration * 1000;
     // Persist the absolute end time (plus which auto action is pending)
     // so a reload / OS-killed PWA can resume the countdown.
     state.restResume = {
       endTime: restEndTime,
       action: restOnComplete === advanceSetAfterRest ? 'set'
             : restOnComplete === autoStartQueueExercise ? 'queue'
+            : restOnComplete === finishQueuePrep ? 'queuePrep'
             : null
     };
     saveState();
@@ -1223,6 +1229,7 @@ if ('serviceWorker' in navigator) {
     restEndTime = null;
     restSignaled = false;
     lastWarningSec = null;
+    restLabel = 'Pihenő';
     state.restResume = null;
     cancelRestCompletionAction();
     const rd = $('rest-display');
@@ -1326,7 +1333,7 @@ if ('serviceWorker' in navigator) {
     const remaining = Math.ceil((restEndTime - Date.now()) / 1000);
     const rd = $('rest-display');
     if (remaining > 0) {
-      rd.textContent = 'Pihenő: ' + formatTime(remaining);
+      rd.textContent = restLabel + ': ' + formatTime(remaining);
       if (remaining <= 3) rd.classList.add('warning');
       else rd.classList.remove('warning', 'done');
       if (state.settings.countdown && remaining <= 3 && remaining !== lastWarningSec) {
@@ -1587,6 +1594,14 @@ if ('serviceWorker' in navigator) {
       startRest();
     }
     render();
+  }
+
+  // A feladatsor eleji felkészülési idő lejártakor fut. Ha a feladatsorban
+  // be van kapcsolva az automatikus indítás, az első gyakorlat magától indul,
+  // különben a felhasználó koppintására vár.
+  function finishQueuePrep() {
+    if (!state.queueState) return;
+    if (state.queueState.autoStart) autoStartQueueExercise();
   }
 
   function autoStartQueueExercise() {
@@ -2056,7 +2071,9 @@ if ('serviceWorker' in navigator) {
       name: queue.name,
       steps: queue.steps.slice(),
       index: 0,
-      autoStart: !!queue.autoStart
+      autoStart: !!queue.autoStart,
+      // Többgyakorlatos feladatsornál az első koppintás felkészülési időt indít.
+      prepPending: queue.steps.length > 1
     };
     state.settings.target = profileTargetForSet(first, 0);
     state.settings.targetSets = first.targetSets || 0;
@@ -2077,7 +2094,14 @@ if ('serviceWorker' in navigator) {
     startWorkoutTimer(true);
     render();
     // Spoken cue so the user knows the first exercise
-    setTimeout(() => speak('Indul: ' + first.name, 1.0), 200);
+    if (state.queueState.prepPending) {
+      const rd = $('rest-display');
+      rd.textContent = 'Első koppintás: fél perc felkészülés';
+      rd.classList.remove('warning', 'done');
+      setTimeout(() => speak('Első gyakorlat: ' + first.name + '. Koppints a felkészüléshez.', 1.0), 200);
+    } else {
+      setTimeout(() => speak('Indul: ' + first.name, 1.0), 200);
+    }
   }
 
   function renderQueueList() {
@@ -2367,6 +2391,23 @@ if ('serviceWorker' in navigator) {
     // Ignore taps during the "gyakorlat kész" / "edzés kész" window —
     // anything counted here would be wiped by the pending advance/reset.
     if (state.workoutCompleted) return;
+    // Többgyakorlatos feladatsor első koppintása: nem ismétlést számol,
+    // hanem fél perc felkészülési időt indít. A gyakorlat csak utána indul.
+    // (Ha a visszaszámlálás alatt újra koppint, az átugorja a felkészülést
+    // és azonnal számolja az első ismétlést.)
+    if (!fromAuto && state.queueState && state.queueState.prepPending) {
+      state.queueState.prepPending = false;
+      ensureToday();
+      stopAllRepFlows();
+      const c = $('counter');
+      c.classList.add('tapped');
+      setTimeout(() => c.classList.remove('tapped'), 100);
+      buzz(20);
+      startRest(finishQueuePrep, QUEUE_PREP_SECONDS, 'Felkészülés');
+      speak('Felkészülés: fél perc', 1.0);
+      saveState();
+      return;
+    }
     ensureToday();
     // User tap cancels any running flow; auto-advance rep also calls this but flows were already stopped before.
     stopAllRepFlows();
@@ -2660,7 +2701,9 @@ if ('serviceWorker' in navigator) {
     restEndTime = state.restResume.endTime;
     restOnComplete = state.restResume.action === 'set' ? advanceSetAfterRest
                    : state.restResume.action === 'queue' ? autoStartQueueExercise
+                   : state.restResume.action === 'queuePrep' ? finishQueuePrep
                    : null;
+    restLabel = state.restResume.action === 'queuePrep' ? 'Felkészülés' : 'Pihenő';
     restSignaled = false;
     lastWarningSec = null;
     restInterval = setInterval(updateRest, 200);
